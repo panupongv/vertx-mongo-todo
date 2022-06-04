@@ -16,20 +16,17 @@ import io.vertx.ext.mongo.MongoClient;
 public class MongoVerticle extends AbstractVerticle {
 
     public static final String CREATE_USER = "com.panupongv.vertx-todo.create_user";
+    public static final String ADD_ITEM = "com.panupongv.vertx-todo.add_item";
     public static final String LIST_ITEMS_BY_DUE_DATE = "com.panupongv.vertx-todo.list_items_by_due_date";
     public static final String LIST_ITEMS_BY_PRIORITY = "com.panupongv.vertx-todo.list_items_by_priority";
     public static final String GET_ITEM = "com.panupongv.vertx-todo.get_item";
     public static final String EDIT_ITEM = "com.panupongv.vertx-todo.edit_item";
     public static final String DELETE_ITEM = "com.panupongv.vertx-todo.delete_item";
 
-    public enum OperationOutcome {
-        SUCCEEDED,
-        FAILED
-    }
-
     private static final String COLLECTION_NAME = "vertx_mongo_todos";
     private static final String USERNAME_KEY = "username";
     private static final String ITEMS_KEY = "items";
+    private static final String ITEM_KEY = "items";
 
     private enum SortOption {
         BY_DATE,
@@ -62,13 +59,18 @@ public class MongoVerticle extends AbstractVerticle {
         System.out.println("Consumer Setup");
 
         vertx.eventBus().consumer(CREATE_USER).handler(this::createUser);
+        vertx.eventBus().consumer(ADD_ITEM).handler(this::addItem);
 
         return Future.succeededFuture();
     }
 
-    private void createUser(Message<Object> msg) {
-        System.out.println("Create User Called");
+    public static JsonObject saveItemMessage(String username, Item item) {
+        return new JsonObject()
+                .put(USERNAME_KEY, username)
+                .put(ITEM_KEY, item.getMongoDbJson());
+    }
 
+    private void createUser(Message<Object> msg) {
         String username = (String) msg.body();
 
         userExists(username)
@@ -82,7 +84,7 @@ public class MongoVerticle extends AbstractVerticle {
                         JsonObject json = new JsonObject(jsonString);
 
                         mongoClient.save(COLLECTION_NAME, json)
-                                .onComplete((asyncResult) -> {
+                                .onComplete(asyncResult -> {
                                     if (asyncResult.succeeded()) {
                                         msg.reply(String.format("User '%s' created", username));
                                     } else {
@@ -98,24 +100,33 @@ public class MongoVerticle extends AbstractVerticle {
 
     }
 
-    private void saveItem(String username, Item item) {
+    private void addItem(Message<Object> msg) {
+
+        JsonObject inputJson = (JsonObject) msg.body();
+        String username = inputJson.getString(USERNAME_KEY);
+        JsonObject newItem = inputJson.getJsonObject(ITEM_KEY);
+
         String queryJsonString = Utils.convertJsonQuotes(String.format("{'username': '%s'}", username));
         JsonObject query = new JsonObject(queryJsonString);
         System.out.println(query);
 
         String updateJsonString = Utils.convertJsonQuotes(String.format(
                 "{'$push': {'items': %s}}",
-                item.getMongoDbJson().toString()));
-        System.out.println(updateJsonString);
-
+                newItem.toString()));
         JsonObject update = new JsonObject(updateJsonString);
         System.out.println(update);
 
-        mongoClient.updateCollection(COLLECTION_NAME, query, update).onComplete(ar -> {
-            if (ar.succeeded()) {
-                System.out.println("Done ");
+        userExists(username).onComplete(userExistsAsyncResult -> {
+            if (userExistsAsyncResult.result()) {
+                mongoClient.updateCollection(COLLECTION_NAME, query, update).onComplete(asyncResult -> {
+                    if (asyncResult.succeeded()) {
+                        msg.reply("Item added");
+                    } else {
+                        msg.fail(500, asyncResult.cause().getMessage());
+                    }
+                });
             } else {
-                System.out.println(ar.cause().getMessage());
+                msg.fail(400, String.format("User '%s' not found", username));
             }
         });
     }
