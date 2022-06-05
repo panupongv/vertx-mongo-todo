@@ -67,14 +67,21 @@ public class MongoVerticle extends AbstractVerticle {
         vertx.eventBus().consumer(ADD_ITEM).handler(this::addItem);
         vertx.eventBus().consumer(LIST_ITEMS_BY_DUE_DATE).handler(listItemsByDueDate);
         vertx.eventBus().consumer(LIST_ITEMS_BY_PRIORITY).handler(listItemsByPriority);
+        vertx.eventBus().consumer(GET_ITEM).handler(this::getItem);
 
         return Future.succeededFuture();
     }
 
-    public static JsonObject saveItemMessage(String username, Item item) {
+    public static JsonObject addItemMessage(String username, Item item) {
         return new JsonObject()
                 .put(USERNAME_KEY, username)
                 .put(ITEM_KEY, item.getMongoDbJson());
+    }
+
+    public static JsonObject getItemMessage(String username, String itemId) {
+        return new JsonObject()
+                .put(USERNAME_KEY, username)
+                .put(Item.MONGO_ID_KEY, itemId);
     }
 
     private void createUser(Message<Object> msg) {
@@ -136,10 +143,9 @@ public class MongoVerticle extends AbstractVerticle {
 
         userExists(username).onComplete(userExistsAsyncResult -> {
             if (userExistsAsyncResult.result()) {
-                JsonObject findUser = new JsonObject()
-                        .put("$match", new JsonObject().put(USERNAME_KEY, username));
+                JsonObject findUser = matchUsernameClause(username);
 
-                JsonObject unwindItems = new JsonObject().put("$unwind", "$" + ITEMS_KEY);
+                JsonObject unwindItems = unwindItemsClause();
 
                 JsonObject excludeDescription = new JsonObject().put("$project", new JsonObject()
                         .put(MONGO_ID_KEY, 1)
@@ -169,7 +175,49 @@ public class MongoVerticle extends AbstractVerticle {
                         .add(groupIntoUser);
 
                 mongoClient.aggregate(COLLECTION_NAME, pipeline).handler(data -> {
+                    JsonArray items = data.getJsonArray(ITEMS_KEY);
+                    if (items == null) {
+                        msg.fail(500, "Internal Server Error: Wrong aggregation result format");
+                        return;
+                    }
                     msg.reply(data.getJsonArray(ITEMS_KEY));
+                });
+            } else {
+                msg.fail(400, String.format("User '%s' not found", username));
+            }
+        });
+    }
+
+    private void getItem(Message<Object> msg) {
+        JsonObject inputJson = (JsonObject) msg.body();
+        String username = inputJson.getString(USERNAME_KEY);
+        String itemId = inputJson.getString(Item.MONGO_ID_KEY);
+
+        userExists(username).onComplete(userExistsAsyncResult -> {
+            if (userExistsAsyncResult.result()) {
+                JsonObject findUser = matchUsernameClause(username);
+
+                JsonObject unwindItems = unwindItemsClause();
+
+                JsonObject findItem = new JsonObject().put(
+                        "$match",
+                        new JsonObject()
+                                .put(ITEMS_KEY + "." + Item.MONGO_ID_KEY, itemId));
+
+                JsonArray pipeline = new JsonArray()
+                        .add(findUser)
+                        .add(unwindItems)
+                        .add(findItem);
+
+                mongoClient.aggregate(COLLECTION_NAME, pipeline).handler(data -> {
+                    JsonObject itemWithDetails = data.getJsonObject(ITEMS_KEY);
+                    if (itemWithDetails == null) {
+                        msg.fail(500, "Internal Server Error: Wrong aggregation result format");
+                        return;
+                    }
+                    msg.reply(itemWithDetails);
+                }).endHandler(readStream -> {
+                    msg.fail(400, String.format("Cannot find item with ID '%s'", itemId));
                 });
             } else {
                 msg.fail(400, String.format("User '%s' not found", username));
@@ -182,5 +230,14 @@ public class MongoVerticle extends AbstractVerticle {
         JsonObject findUserJson = new JsonObject(findUserJsonString);
 
         return mongoClient.find(COLLECTION_NAME, findUserJson).map(users -> users.size() == 1);
+    }
+
+    private JsonObject matchUsernameClause(String username) {
+        return new JsonObject()
+                .put("$match", new JsonObject().put(USERNAME_KEY, username));
+    }
+
+    private JsonObject unwindItemsClause() {
+        return new JsonObject().put("$unwind", "$" + ITEMS_KEY);
     }
 }
