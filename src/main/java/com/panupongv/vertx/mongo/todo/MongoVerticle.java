@@ -8,8 +8,10 @@ import org.bson.types.ObjectId;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
+import io.vertx.core.Handler;
 import io.vertx.core.Promise;
 import io.vertx.core.eventbus.Message;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.MongoClient;
 
@@ -24,6 +26,7 @@ public class MongoVerticle extends AbstractVerticle {
     public static final String DELETE_ITEM = "com.panupongv.vertx-todo.delete_item";
 
     private static final String COLLECTION_NAME = "vertx_mongo_todos";
+    private static final String MONGO_ID_KEY = "_id";
     private static final String USERNAME_KEY = "username";
     private static final String ITEMS_KEY = "items";
     private static final String ITEM_KEY = "items";
@@ -56,10 +59,14 @@ public class MongoVerticle extends AbstractVerticle {
     }
 
     private Future<Void> configureEventBusConsumers(Void unused) {
-        System.out.println("Consumer Setup");
+        Handler<Message<Object>> listItemsByDueDate = (Message<Object> msg) -> this.listItems(SortOption.BY_DATE, msg);
+        Handler<Message<Object>> listItemsByPriority = (Message<Object> msg) -> this.listItems(SortOption.BY_PRIORITY,
+                msg);
 
         vertx.eventBus().consumer(CREATE_USER).handler(this::createUser);
         vertx.eventBus().consumer(ADD_ITEM).handler(this::addItem);
+        vertx.eventBus().consumer(LIST_ITEMS_BY_DUE_DATE).handler(listItemsByDueDate);
+        vertx.eventBus().consumer(LIST_ITEMS_BY_PRIORITY).handler(listItemsByPriority);
 
         return Future.succeededFuture();
     }
@@ -80,7 +87,8 @@ public class MongoVerticle extends AbstractVerticle {
                         msg.fail(400, String.format("User '%s' already exists", username));
                     } else {
                         String jsonString = Utils
-                                .convertJsonQuotes(String.format("{'username': '%s', 'items': []}", username));
+                                .convertJsonQuotes(
+                                        String.format("{'%s': '%s', '%s': []}", USERNAME_KEY, username, ITEMS_KEY));
                         JsonObject json = new JsonObject(jsonString);
 
                         mongoClient.save(COLLECTION_NAME, json)
@@ -95,26 +103,18 @@ public class MongoVerticle extends AbstractVerticle {
                 });
     }
 
-    private void listItems(SortOption sortOption, Message<Object> msg) { // User name, sort options?
-        String username = (String) msg.body();
-
-    }
-
     private void addItem(Message<Object> msg) {
 
         JsonObject inputJson = (JsonObject) msg.body();
         String username = inputJson.getString(USERNAME_KEY);
         JsonObject newItem = inputJson.getJsonObject(ITEM_KEY);
 
-        String queryJsonString = Utils.convertJsonQuotes(String.format("{'username': '%s'}", username));
+        String queryJsonString = Utils.convertJsonQuotes(String.format("{'%s': '%s'}", USERNAME_KEY, username));
         JsonObject query = new JsonObject(queryJsonString);
-        System.out.println(query);
 
-        String updateJsonString = Utils.convertJsonQuotes(String.format(
-                "{'$push': {'items': %s}}",
-                newItem.toString()));
+        String updateJsonString = Utils.convertJsonQuotes(
+                String.format("{'$push': {'%s': %s}}", ITEMS_KEY, newItem.toString()));
         JsonObject update = new JsonObject(updateJsonString);
-        System.out.println(update);
 
         userExists(username).onComplete(userExistsAsyncResult -> {
             if (userExistsAsyncResult.result()) {
@@ -124,6 +124,52 @@ public class MongoVerticle extends AbstractVerticle {
                     } else {
                         msg.fail(500, asyncResult.cause().getMessage());
                     }
+                });
+            } else {
+                msg.fail(400, String.format("User '%s' not found", username));
+            }
+        });
+    }
+
+    private void listItems(SortOption sortOption, Message<Object> msg) { // User name, sort options?
+        String username = (String) msg.body();
+
+        userExists(username).onComplete(userExistsAsyncResult -> {
+            if (userExistsAsyncResult.result()) {
+                JsonObject findUser = new JsonObject()
+                        .put("$match", new JsonObject().put(USERNAME_KEY, username));
+
+                JsonObject unwindItems = new JsonObject().put("$unwind", "$" + ITEMS_KEY);
+
+                JsonObject excludeDescription = new JsonObject().put("$project", new JsonObject()
+                        .put(MONGO_ID_KEY, 1)
+                        .put(USERNAME_KEY, 0)
+                        .put(ITEMS_KEY, new JsonObject().put(Item.DESCRIPTION_KEY, 0)));
+
+                JsonObject sortItemsOption = new JsonObject().put(ITEMS_KEY + "." + Item.DUE_DATE_KEY, 1);
+                switch (sortOption) {
+                    case BY_DATE:
+                        break;
+                    case BY_PRIORITY:
+                        sortItemsOption = new JsonObject().put(ITEMS_KEY + "." + Item.PRIORITY_KEY, -1);
+                        break;
+                }
+                JsonObject sortItems = new JsonObject().put("$sort", sortItemsOption);
+
+                JsonObject groupIntoUser = new JsonObject().put("$group",
+                        new JsonObject()
+                                .put(Item.MONGO_ID_KEY, "$_id")
+                                .put(ITEMS_KEY, new JsonObject().put("$push", "$" + ITEMS_KEY)));
+
+                JsonArray pipeline = new JsonArray()
+                        .add(findUser)
+                        .add(unwindItems)
+                        .add(excludeDescription)
+                        .add(sortItems)
+                        .add(groupIntoUser);
+
+                mongoClient.aggregate(COLLECTION_NAME, pipeline).handler(data -> {
+                    msg.reply(data.getJsonArray(ITEMS_KEY));
                 });
             } else {
                 msg.fail(400, String.format("User '%s' not found", username));
