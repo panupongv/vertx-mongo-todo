@@ -29,7 +29,7 @@ public class MongoVerticle extends AbstractVerticle {
     private static final String MONGO_ID_KEY = "_id";
     private static final String USERNAME_KEY = "username";
     private static final String ITEMS_KEY = "items";
-    private static final String ITEM_KEY = "items";
+    private static final String ITEM_KEY = "item";
 
     private enum SortOption {
         BY_DATE,
@@ -68,6 +68,7 @@ public class MongoVerticle extends AbstractVerticle {
         vertx.eventBus().consumer(LIST_ITEMS_BY_DUE_DATE).handler(listItemsByDueDate);
         vertx.eventBus().consumer(LIST_ITEMS_BY_PRIORITY).handler(listItemsByPriority);
         vertx.eventBus().consumer(GET_ITEM).handler(this::getItem);
+        vertx.eventBus().consumer(EDIT_ITEM).handler(this::editItem);
 
         return Future.succeededFuture();
     }
@@ -82,6 +83,12 @@ public class MongoVerticle extends AbstractVerticle {
         return new JsonObject()
                 .put(USERNAME_KEY, username)
                 .put(Item.MONGO_ID_KEY, itemId);
+    }
+
+    public static JsonObject editItemMessage(String username, Item item) {
+        return new JsonObject()
+                .put(USERNAME_KEY, username)
+                .put(ITEM_KEY, item.getMongoDbJson());
     }
 
     private void createUser(Message<Object> msg) {
@@ -116,15 +123,15 @@ public class MongoVerticle extends AbstractVerticle {
         String username = inputJson.getString(USERNAME_KEY);
         JsonObject newItem = inputJson.getJsonObject(ITEM_KEY);
 
-        String queryJsonString = Utils.convertJsonQuotes(String.format("{'%s': '%s'}", USERNAME_KEY, username));
-        JsonObject query = new JsonObject(queryJsonString);
-
-        String updateJsonString = Utils.convertJsonQuotes(
-                String.format("{'$push': {'%s': %s}}", ITEMS_KEY, newItem.toString()));
-        JsonObject update = new JsonObject(updateJsonString);
-
         userExists(username).onComplete(userExistsAsyncResult -> {
             if (userExistsAsyncResult.result()) {
+                String queryJsonString = Utils.convertJsonQuotes(String.format("{'%s': '%s'}", USERNAME_KEY, username));
+                JsonObject query = new JsonObject(queryJsonString);
+
+                String updateJsonString = Utils.convertJsonQuotes(
+                        String.format("{'$push': {'%s': %s}}", ITEMS_KEY, newItem.toString()));
+                JsonObject update = new JsonObject(updateJsonString);
+
                 mongoClient.updateCollection(COLLECTION_NAME, query, update).onComplete(asyncResult -> {
                     if (asyncResult.succeeded()) {
                         msg.reply("Item added");
@@ -219,6 +226,43 @@ public class MongoVerticle extends AbstractVerticle {
                 }).endHandler(readStream -> {
                     msg.fail(400, String.format("Cannot find item with ID '%s'", itemId));
                 });
+            } else {
+                msg.fail(400, String.format("User '%s' not found", username));
+            }
+        });
+    }
+
+    private void editItem(Message<Object> msg) {
+        JsonObject inputJson = (JsonObject) msg.body();
+        String username = inputJson.getString(USERNAME_KEY);
+        JsonObject item = inputJson.getJsonObject(ITEM_KEY);
+
+        userExists(username).onComplete(userExistsAsyncResult -> {
+            JsonObject query = new JsonObject()
+                    .put(USERNAME_KEY, username)
+                    .put(ITEMS_KEY + "." + Item.MONGO_ID_KEY, item.getString(Item.MONGO_ID_KEY));
+
+            JsonObject update = new JsonObject().put(
+                    "$set", new JsonObject().put(ITEMS_KEY + ".$", item));
+
+            if (userExistsAsyncResult.result()) {
+                mongoClient.updateCollection(
+                        COLLECTION_NAME, query, update).onComplete(asyncResult -> {
+                            if (asyncResult.succeeded()) {
+                                if (asyncResult.result().getDocMatched() == 0) {
+                                    msg.fail(400, String.format("Cannot find item with ID '%s'",
+                                            item.getString(Item.MONGO_ID_KEY)));
+                                    return;
+                                }
+                                if (asyncResult.result().getDocModified() == 0) {
+                                    msg.fail(400, "No changes");
+                                    return;
+                                }
+                                msg.reply("Item updated");
+                            } else {
+                                msg.fail(500, asyncResult.cause().toString());
+                            }
+                        });
             } else {
                 msg.fail(400, String.format("User '%s' not found", username));
             }

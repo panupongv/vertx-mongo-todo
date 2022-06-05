@@ -24,11 +24,11 @@ public class Item {
     private int priority;
 
     public Item(String name, String description, Date dueDate, int priority) {
-        this(null, name, description, dueDate, priority);
+        this(new ObjectId(), name, description, dueDate, priority);
     }
 
     public Item(ObjectId mongoId, String name, String description, Date dueDate, int priority) {
-        this.mongoId = ObjectId.get();
+        this.mongoId = mongoId;
         this.name = name;
         this.description = description;
         this.dueDate = dueDate;
