@@ -1,12 +1,6 @@
 package com.panupongv.vertx.mongo.todo;
 
-import java.util.Date;
-import java.util.List;
-
-import org.bson.types.ObjectId;
-
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Promise;
@@ -69,6 +63,7 @@ public class MongoVerticle extends AbstractVerticle {
         vertx.eventBus().consumer(LIST_ITEMS_BY_PRIORITY).handler(listItemsByPriority);
         vertx.eventBus().consumer(GET_ITEM).handler(this::getItem);
         vertx.eventBus().consumer(EDIT_ITEM).handler(this::editItem);
+        vertx.eventBus().consumer(DELETE_ITEM).handler(this::deleteItem);
 
         return Future.succeededFuture();
     }
@@ -89,6 +84,12 @@ public class MongoVerticle extends AbstractVerticle {
         return new JsonObject()
                 .put(USERNAME_KEY, username)
                 .put(ITEM_KEY, item.getMongoDbJson());
+    }
+
+    public static JsonObject deleteItemMessage(String username, String itemId) {
+        return new JsonObject()
+                .put(USERNAME_KEY, username)
+                .put(Item.MONGO_ID_KEY, itemId);
     }
 
     private void createUser(Message<Object> msg) {
@@ -238,9 +239,7 @@ public class MongoVerticle extends AbstractVerticle {
         JsonObject item = inputJson.getJsonObject(ITEM_KEY);
 
         userExists(username).onComplete(userExistsAsyncResult -> {
-            JsonObject query = new JsonObject()
-                    .put(USERNAME_KEY, username)
-                    .put(ITEMS_KEY + "." + Item.MONGO_ID_KEY, item.getString(Item.MONGO_ID_KEY));
+            JsonObject query = findItemUnderUser(username, item.getString(MONGO_ID_KEY));
 
             JsonObject update = new JsonObject().put(
                     "$set", new JsonObject().put(ITEMS_KEY + ".$", item));
@@ -269,6 +268,43 @@ public class MongoVerticle extends AbstractVerticle {
         });
     }
 
+    private void deleteItem(Message<Object> msg) {
+        JsonObject inputJson = (JsonObject) msg.body();
+        String username = inputJson.getString(USERNAME_KEY);
+        String itemId = inputJson.getString(MONGO_ID_KEY);
+
+        userExists(username).onComplete(userExistsAsyncResult -> {
+            if (userExistsAsyncResult.result()) {
+                JsonObject query = findItemUnderUser(username, itemId);
+
+                JsonObject update = new JsonObject()
+                        .put("$pull", new JsonObject().put(ITEMS_KEY,
+                                new JsonObject().put(Item.MONGO_ID_KEY, itemId)));
+
+                mongoClient.updateCollection(COLLECTION_NAME, query, update).onComplete(asyncResult -> {
+                    if (asyncResult.succeeded()) {
+                        if (asyncResult.result().getDocMatched() == 0) {
+                            msg.fail(400,
+                                    String.format("Cannot find item with ID '%s'",
+                                            itemId));
+                            return;
+                        }
+                        if (asyncResult.result().getDocModified() == 0) {
+                            msg.fail(400, "No item removed");
+                            return;
+                        }
+                        msg.reply("Item removed");
+
+                    } else {
+                        msg.fail(400, asyncResult.cause().getMessage());
+                    }
+                });
+            } else {
+                msg.fail(400, String.format("User '%s' not found", username));
+            }
+        });
+    }
+
     private Future<Boolean> userExists(String username) {
         String findUserJsonString = Utils.convertJsonQuotes(String.format("{'username': '%s'}", username));
         JsonObject findUserJson = new JsonObject(findUserJsonString);
@@ -283,5 +319,11 @@ public class MongoVerticle extends AbstractVerticle {
 
     private JsonObject unwindItemsClause() {
         return new JsonObject().put("$unwind", "$" + ITEMS_KEY);
+    }
+
+    private JsonObject findItemUnderUser(String username, String itemId) {
+        return new JsonObject()
+                .put(USERNAME_KEY, username)
+                .put(ITEMS_KEY + "." + Item.MONGO_ID_KEY, itemId);
     }
 }
