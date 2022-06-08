@@ -19,6 +19,9 @@ public class MongoVerticle extends AbstractVerticle {
     public static final String EDIT_ITEM = "com.panupongv.vertx-todo.edit_item";
     public static final String DELETE_ITEM = "com.panupongv.vertx-todo.delete_item";
 
+    public static final String REPLY_STATUS_CODE_KEY = "statusCode";
+    public static final String REPLY_MESSAGE_CODE_KEY = "message";
+
     private static final String COLLECTION_NAME = "vertx_mongo_todos";
     private static final String MONGO_ID_KEY = "_id";
     private static final String USERNAME_KEY = "username";
@@ -92,6 +95,12 @@ public class MongoVerticle extends AbstractVerticle {
                 .put(Item.MONGO_ID_KEY, itemId);
     }
 
+    public static JsonObject resultJson(int statusCode, String message) {
+        return new JsonObject()
+                .put(REPLY_STATUS_CODE_KEY, statusCode)
+                .put(REPLY_MESSAGE_CODE_KEY, message);
+    }
+
     private void createUser(Message<Object> msg) {
         String username = (String) msg.body();
 
@@ -99,22 +108,21 @@ public class MongoVerticle extends AbstractVerticle {
                 .onComplete(userExistsAsyncResult -> {
                     boolean userExists = userExistsAsyncResult.result();
                     if (userExists) {
-                        msg.fail(400, String.format("User '%s' already exists", username));
+                        msg.reply(resultJson(400, String.format("User '%s' already exists", username)));
                     } else {
-                        String jsonString = Utils
-                                .convertJsonQuotes(
-                                        String.format("{'%s': '%s', '%s': []}", USERNAME_KEY, username, ITEMS_KEY));
-                        JsonObject json = new JsonObject(jsonString);
+                        JsonObject json = new JsonObject().put(USERNAME_KEY, username).put(ITEMS_KEY, new JsonArray());
 
                         mongoClient.save(COLLECTION_NAME, json)
                                 .onComplete(asyncResult -> {
                                     if (asyncResult.succeeded()) {
-                                        msg.reply(String.format("User '%s' created", username));
+                                        msg.reply(resultJson(200, String.format("User '%s' created", username)));
                                     } else {
-                                        msg.fail(500, asyncResult.cause().getMessage());
+                                        msg.reply(resultJson(500, asyncResult.cause().getMessage()));
                                     }
                                 });
                     }
+                }).onFailure(throwable -> {
+                    msg.fail(500, throwable.getMessage());
                 });
     }
 
@@ -135,13 +143,13 @@ public class MongoVerticle extends AbstractVerticle {
 
                 mongoClient.updateCollection(COLLECTION_NAME, query, update).onComplete(asyncResult -> {
                     if (asyncResult.succeeded()) {
-                        msg.reply("Item added");
+                        msg.reply(resultJson(200, "Item added"));
                     } else {
-                        msg.fail(500, asyncResult.cause().getMessage());
+                        msg.reply(resultJson(500, asyncResult.cause().getMessage()));
                     }
                 });
             } else {
-                msg.fail(400, String.format("User '%s' not found", username));
+                msg.reply(resultJson(400, String.format("User '%s' not found", username)));
             }
         });
     }
