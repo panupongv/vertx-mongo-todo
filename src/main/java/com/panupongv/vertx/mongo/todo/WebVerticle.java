@@ -7,6 +7,7 @@ import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.LoggerHandler;
 
 public class WebVerticle extends AbstractVerticle {
 
@@ -20,6 +21,7 @@ public class WebVerticle extends AbstractVerticle {
     Future<Router> configureRouter() {
         Router router = Router.router(vertx);
 
+        router.route().handler(LoggerHandler.create());
         router.post("/api/v1/users/:username").handler(this::createUserHandler);
 
         return Future.succeededFuture(router);

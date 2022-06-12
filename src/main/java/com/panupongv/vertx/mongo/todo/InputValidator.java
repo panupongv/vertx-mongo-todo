@@ -1,7 +1,5 @@
 package com.panupongv.vertx.mongo.todo;
 
-import java.util.Arrays;
-
 public class InputValidator {
 
     public static final int USERNAME_MIN_LENGTH = 4;
