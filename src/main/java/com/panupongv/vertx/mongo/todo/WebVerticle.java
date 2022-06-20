@@ -2,6 +2,7 @@ package com.panupongv.vertx.mongo.todo;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
+import io.vertx.core.Handler;
 import io.vertx.core.Promise;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.JsonObject;
@@ -21,8 +22,11 @@ public class WebVerticle extends AbstractVerticle {
     Future<Router> configureRouter() {
         Router router = Router.router(vertx);
 
+        Handler<RoutingContext> checkUserExist = (RoutingContext ctx) -> checkUserExistence(ctx, true);
+        Handler<RoutingContext> checkUserDoesNotExist = (RoutingContext ctx) -> checkUserExistence(ctx, false);
+
         router.route().handler(LoggerHandler.create());
-        router.post("/api/v1/users/:username").handler(this::createUserHandler);
+        router.post("/api/v1/users/:username").handler(checkUserDoesNotExist).handler(this::createUserHandler);
 
         return Future.succeededFuture(router);
     }
@@ -30,6 +34,26 @@ public class WebVerticle extends AbstractVerticle {
     Future<Void> startHttpServer(Router router) {
         HttpServer server = vertx.createHttpServer().requestHandler(router);
         return Future.<HttpServer>future(promise -> server.listen(8080, promise)).mapEmpty();
+    }
+
+    void checkUserExistence(RoutingContext ctx, boolean userShouldExist) {
+        String username = ctx.pathParam("username");
+        vertx.eventBus().request(MongoVerticle.CHECK_USER_EXIST, username, databaseResult -> {
+            if (databaseResult.succeeded()) {
+                Boolean userExists = (Boolean) databaseResult.result().body();
+                if (userExists == userShouldExist) {
+                    ctx.next();
+                } else {
+                    ctx.request().response().setStatusCode(400).end(
+                        userExists?
+                        String.format("User '%s' already exist", username) :
+                        String.format("User '%s' does not exist", username)
+                    );
+                }
+            } else {
+                ctx.request().response().setStatusCode(500).end(String.format("Internal Server Error when looking up User '%s'", username));
+            }
+        });
     }
 
     void createUserHandler(RoutingContext ctx) {
@@ -46,7 +70,7 @@ public class WebVerticle extends AbstractVerticle {
             if (databaseResult.succeeded()) {
                 JsonObject reply = (JsonObject) databaseResult.result().body();
                 int statusCode = reply.getInteger(MongoVerticle.REPLY_STATUS_CODE_KEY);
-                String message = reply.getString(MongoVerticle.REPLY_MESSAGE_CODE_KEY);
+                String message = reply.getString(MongoVerticle.REPLY_CONTENT_KEY);
                 ctx.request().response().setStatusCode(statusCode).end(message);
             } else {
                 System.out.println(databaseResult.cause());
