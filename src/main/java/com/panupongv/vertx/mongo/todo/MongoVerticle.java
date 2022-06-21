@@ -11,6 +11,8 @@ import io.vertx.ext.mongo.MongoClient;
 
 public class MongoVerticle extends AbstractVerticle {
 
+    private static final int SETUP_TIMEOUT = 10000;
+
     public static final String CHECK_USER_EXIST = "com.panupongv.vertx-todo.check_user_exist";
     public static final String CREATE_USER = "com.panupongv.vertx-todo.create_user";
     public static final String ADD_ITEM = "com.panupongv.vertx-todo.add_item";
@@ -38,9 +40,13 @@ public class MongoVerticle extends AbstractVerticle {
 
     @Override
     public void start(Promise<Void> start) {
+        vertx.setTimer(SETUP_TIMEOUT, duration -> {
+            start.tryFail(new Throwable(
+                    String.format("Mongo Client Setup exceeded timeout of %d milliseconds", SETUP_TIMEOUT)));
+        });
         configureMongoDbClient()
                 .compose(this::configureEventBusConsumers)
-                .onFailure(start::fail)
+                .onFailure(start::tryFail)
                 .onComplete(start::handle);
     }
 
@@ -54,7 +60,7 @@ public class MongoVerticle extends AbstractVerticle {
                     .put("db_name", db);
 
             mongoClient = MongoClient.createShared(vertx, mongoconfig);
-            
+
             return mongoClient.runCommand("ping", new JsonObject().put("ping", 1)).mapEmpty();
         } catch (Exception e) {
             return Future.failedFuture(e.getMessage());
@@ -63,7 +69,8 @@ public class MongoVerticle extends AbstractVerticle {
 
     private Future<Void> configureEventBusConsumers(Void unused) {
         Handler<Message<Object>> listItemsByDueDate = (Message<Object> msg) -> this.listItems(SortOption.BY_DATE, msg);
-        Handler<Message<Object>> listItemsByPriority = (Message<Object> msg) -> this.listItems(SortOption.BY_PRIORITY, msg);
+        Handler<Message<Object>> listItemsByPriority = (Message<Object> msg) -> this.listItems(SortOption.BY_PRIORITY,
+                msg);
 
         vertx.eventBus().consumer(CHECK_USER_EXIST).handler(this::checkUserExists);
         vertx.eventBus().consumer(CREATE_USER).handler(this::createUser);
