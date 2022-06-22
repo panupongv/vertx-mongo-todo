@@ -12,6 +12,8 @@ import io.vertx.ext.web.handler.LoggerHandler;
 
 public class WebVerticle extends AbstractVerticle {
 
+    private static final int createUserTimeout = 7000;
+
     @Override
     public void start(Promise<Void> start) {
         configureRouter()
@@ -26,7 +28,8 @@ public class WebVerticle extends AbstractVerticle {
         Handler<RoutingContext> checkUserDoesNotExist = (RoutingContext ctx) -> checkUserExistence(ctx, false);
 
         router.route().handler(LoggerHandler.create());
-        router.post("/api/v1/users/:username").handler(checkUserDoesNotExist).handler(this::createUserHandler);
+        router.post("/api/v1/users/:username").handler(requestTimeout("Create User", createUserTimeout))
+                .handler(checkUserDoesNotExist).handler(this::createUserHandler);
 
         return Future.succeededFuture(router);
     }
@@ -34,6 +37,22 @@ public class WebVerticle extends AbstractVerticle {
     Future<Void> startHttpServer(Router router) {
         HttpServer server = vertx.createHttpServer().requestHandler(router);
         return Future.<HttpServer>future(promise -> server.listen(8080, promise)).mapEmpty();
+    }
+
+    Handler<RoutingContext> requestTimeout(String requestName, int timeout) {
+        if (timeout < 0)
+            throw new IllegalArgumentException("Timeout duration must be a positive integer");
+        return (RoutingContext ctx) -> {
+            vertx.setTimer(timeout, d -> {
+                try {
+                    ctx.request().response().setStatusCode(500).end(
+                            String.format("Request timeout: %s", requestName));
+                } catch (IllegalStateException e) {
+                    System.out.println("Request handled before timeout");
+                }
+            });
+            ctx.next();
+        };
     }
 
     void checkUserExistence(RoutingContext ctx, boolean userShouldExist) {
@@ -45,13 +64,12 @@ public class WebVerticle extends AbstractVerticle {
                     ctx.next();
                 } else {
                     ctx.request().response().setStatusCode(400).end(
-                        userExists?
-                        String.format("User '%s' already exist", username) :
-                        String.format("User '%s' does not exist", username)
-                    );
+                            userExists ? String.format("User '%s' already exist", username)
+                                    : String.format("User '%s' does not exist", username));
                 }
             } else {
-                ctx.request().response().setStatusCode(500).end(String.format("Internal Server Error when looking up User '%s'", username));
+                ctx.request().response().setStatusCode(500)
+                        .end(String.format("Internal Server Error when looking up User '%s'", username));
             }
         });
     }
