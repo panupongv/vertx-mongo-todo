@@ -8,6 +8,7 @@ import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
 
 public class WebVerticle extends AbstractVerticle {
@@ -28,8 +29,12 @@ public class WebVerticle extends AbstractVerticle {
         Handler<RoutingContext> checkUserDoesNotExist = (RoutingContext ctx) -> checkUserExistence(ctx, false);
 
         router.route().handler(LoggerHandler.create());
-        router.post("/api/v1/users/:username").handler(requestTimeout("Create User", createUserTimeout))
-                .handler(checkUserDoesNotExist).handler(this::createUserHandler);
+        router.route().handler(BodyHandler.create());
+        router.post("/api/v1/users")
+                .handler(requestTimeout("Create User", createUserTimeout))
+                .handler(this::checkUsernameIsValid)
+                .handler(checkUserDoesNotExist)
+                .handler(this::createUserHandler);
 
         return Future.succeededFuture(router);
     }
@@ -55,8 +60,25 @@ public class WebVerticle extends AbstractVerticle {
         };
     }
 
+    void checkUsernameIsValid(RoutingContext ctx) {
+        String username = ctx.getBodyAsJson().getString("username");
+        if (username == null) {
+            ctx.request().response().setStatusCode(400).end("A username must be provided");
+            return;
+        }
+        if (!InputValidator.validateUsername(username)) {
+            String message = String.format(
+                    "Username must contain only alphabets and numbers, and must be between %d and %d characters long",
+                    InputValidator.USERNAME_MIN_LENGTH,
+                    InputValidator.USERNAME_MAX_LENGTH);
+            ctx.request().response().setStatusCode(400).end(message);
+            return;
+        }
+        ctx.next();
+    }
+
     void checkUserExistence(RoutingContext ctx, boolean userShouldExist) {
-        String username = ctx.pathParam("username");
+        String username = ctx.getBodyAsJson().getString("username");
         vertx.eventBus().request(MongoVerticle.CHECK_USER_EXIST, username, databaseResult -> {
             if (databaseResult.succeeded()) {
                 Boolean userExists = (Boolean) databaseResult.result().body();
@@ -75,15 +97,7 @@ public class WebVerticle extends AbstractVerticle {
     }
 
     void createUserHandler(RoutingContext ctx) {
-        String username = ctx.pathParam("username");
-        if (!InputValidator.validateUsername(username)) {
-            String message = String.format(
-                    "Username must contain only alphabets and numbers, and must be between %d and %d characters long",
-                    InputValidator.USERNAME_MIN_LENGTH,
-                    InputValidator.USERNAME_MAX_LENGTH);
-            ctx.request().response().setStatusCode(400).end(message);
-            return;
-        }
+        String username = ctx.getBodyAsJson().getString("username");
         vertx.eventBus().request(MongoVerticle.CREATE_USER, username, databaseResult -> {
             if (databaseResult.succeeded()) {
                 JsonObject reply = (JsonObject) databaseResult.result().body();
