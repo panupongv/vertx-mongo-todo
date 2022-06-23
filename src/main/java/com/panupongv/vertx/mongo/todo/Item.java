@@ -1,8 +1,5 @@
 package com.panupongv.vertx.mongo.todo;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.regex.Pattern;
 
 import org.bson.types.ObjectId;
