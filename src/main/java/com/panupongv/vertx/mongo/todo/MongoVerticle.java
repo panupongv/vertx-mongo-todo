@@ -1,5 +1,7 @@
 package com.panupongv.vertx.mongo.todo;
 
+import org.bson.types.ObjectId;
+
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
@@ -84,10 +86,10 @@ public class MongoVerticle extends AbstractVerticle {
         return Future.succeededFuture();
     }
 
-    public static JsonObject addItemMessage(String username, Item item) {
+    public static JsonObject addItemMessage(String username, JsonObject itemJson) {
         return new JsonObject()
                 .put(USERNAME_KEY, username)
-                .put(ITEM_KEY, item.getMongoDbJson());
+                .put(ITEM_KEY, itemJson);
     }
 
     public static JsonObject getItemMessage(String username, String itemId) {
@@ -149,14 +151,10 @@ public class MongoVerticle extends AbstractVerticle {
     private void addItem(Message<Object> msg) {
         JsonObject inputJson = (JsonObject) msg.body();
         String username = inputJson.getString(USERNAME_KEY);
-        JsonObject newItem = inputJson.getJsonObject(ITEM_KEY);
+        JsonObject newItem = inputJson.getJsonObject(ITEM_KEY).put(Item.MONGO_ID_KEY, new ObjectId().toString());
 
-        String queryJsonString = Utils.convertJsonQuotes(String.format("{'%s':'%s'}", USERNAME_KEY, username));
-        JsonObject query = new JsonObject(queryJsonString);
-
-        String updateJsonString = Utils.convertJsonQuotes(
-                String.format("{'$push': {'%s': %s}}", ITEMS_KEY, newItem.toString()));
-        JsonObject update = new JsonObject(updateJsonString);
+        JsonObject query = new JsonObject().put(USERNAME_KEY, username);
+        JsonObject update = new JsonObject().put("$push", new JsonObject().put(ITEMS_KEY, newItem));
 
         mongoClient.updateCollection(COLLECTION_NAME, query,
                 update).onComplete(asyncResult -> {

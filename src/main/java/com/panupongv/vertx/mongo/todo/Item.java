@@ -1,5 +1,8 @@
 package com.panupongv.vertx.mongo.todo;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.bson.types.ObjectId;
@@ -44,6 +47,51 @@ public class Item {
         this.priority = priority;
     }
 
+    public static List<String> collectErrorsFromJson(JsonObject itemJson) {
+        Map<String, Object> itemMap = itemJson.getMap();
+        List<String> errors = new ArrayList<String>();
+
+        if (itemMap.size() > 4) {
+            errors.add(String.format("Only 4 fields allowed: %s, %s, %s and %s",
+                    NAME_KEY,
+                    DESCRIPTION_KEY,
+                    DUE_DATE_KEY,
+                    PRIORITY_KEY));
+        }
+
+        Object name = itemMap.get(NAME_KEY);
+        if (name == null)
+            errors.add(String.format("Missing item name, please use the key '%s'", NAME_KEY));
+        else if (!(name instanceof String))
+            errors.add("Item name must be a string");
+        else if (!isValidName((String) name))
+            errors.add(String.format("Item name must be a non-empty string with %d characters limit", MAX_NAME_LENGTH));
+
+        Object description = itemMap.get(DESCRIPTION_KEY);
+        if (description == null)
+            errors.add(String.format("Missing item description, please use the key '%s'", DESCRIPTION_KEY));
+        else if (!(description instanceof String))
+            errors.add("Item description must be a string");
+        else if (!isValidDescription((String) description))
+            errors.add(String.format("Item description must be not exceed %d characters", MAX_DESCRIPTION_LENGTH));
+
+        Object dueDate = itemMap.get(DUE_DATE_KEY);
+        if (dueDate == null)
+            errors.add(String.format("Missing the due date, please use the key '%s'", DUE_DATE_KEY));
+        else if (!(dueDate instanceof String))
+            errors.add("Item due date must be a string");
+        else if (!isValidDateFormat((String) dueDate))
+            errors.add("Item due date must be in the YYYY-MM-DD format");
+
+        Object priority = itemMap.get(PRIORITY_KEY);
+        if (priority == null)
+            errors.add(String.format("Missing item priority, please use the key '%s'", PRIORITY_KEY));
+        else if (!(priority instanceof Integer))
+            errors.add("Item priority must be an integer");
+
+        return errors;
+    }
+
     public JsonObject getMongoDbJson() {
         JsonObject itemJson = new JsonObject()
                 .put(MONGO_ID_KEY, mongoId.toString())
@@ -60,7 +108,7 @@ public class Item {
     }
 
     public static boolean isValidDescription(String description) {
-        return description.length() > 0 && description.length() <= MAX_DESCRIPTION_LENGTH;
+        return description.length() <= MAX_DESCRIPTION_LENGTH;
     }
 
     public static boolean isValidDateFormat(String date) {
