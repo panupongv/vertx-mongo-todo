@@ -1,14 +1,11 @@
-package panupongv.vertx.mongo.todo;
+package com.panupongv.vertx.mongo.todo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Test;
-
-import com.panupongv.vertx.mongo.todo.Item;
 
 import io.vertx.core.json.JsonObject;
 
@@ -33,12 +30,28 @@ public class ItemTest {
                 .put(Item.PRIORITY_KEY, 123);
         assertEquals(1, Item.collectErrorsFromJson(wrongTypeJson).size());
 
+        JsonObject invalidKeyJson = new JsonObject()
+                .put(Item.NAME_KEY, "Name")
+                .put(Item.DESCRIPTION_KEY + "tainted_key", "Description")
+                .put(Item.DUE_DATE_KEY, "2022-01-01")
+                .put(Item.PRIORITY_KEY, 123);
+        assertEquals(1, Item.collectErrorsFromJson(invalidKeyJson).size());
+
+        JsonObject twoInvalidKeysJson = new JsonObject()
+                .put(Item.NAME_KEY, "Name")
+                .put(Item.DESCRIPTION_KEY, "Description")
+                .put(Item.DUE_DATE_KEY, "2022-01-01")
+                .put(Item.PRIORITY_KEY, 123)
+                .put("random_key", 456)
+                .put("random_key2", "789");
+        assertEquals(2, Item.collectErrorsFromJson(twoInvalidKeysJson).size());
+
         JsonObject validJson = new JsonObject()
                 .put(Item.NAME_KEY, "Name")
                 .put(Item.DESCRIPTION_KEY, "Description")
                 .put(Item.DUE_DATE_KEY, "2022-01-01")
                 .put(Item.PRIORITY_KEY, 123);
-        assumeTrue(Item.collectErrorsFromJson(validJson).isEmpty());
+        assertTrue(Item.collectErrorsFromJson(validJson).isEmpty());
     }
 
     @Test

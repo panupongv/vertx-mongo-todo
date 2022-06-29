@@ -1,10 +1,8 @@
-package panupongv.vertx.mongo.todo;
+package com.panupongv.vertx.mongo.todo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
-
-import com.panupongv.vertx.mongo.todo.InputValidator;
 
 public class InputValidatorTest {
     @Test

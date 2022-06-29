@@ -51,13 +51,15 @@ public class Item {
         Map<String, Object> itemMap = itemJson.getMap();
         List<String> errors = new ArrayList<String>();
 
-        if (itemMap.size() > 4) {
-            errors.add(String.format("Only 4 fields allowed: %s, %s, %s and %s",
-                    NAME_KEY,
-                    DESCRIPTION_KEY,
-                    DUE_DATE_KEY,
-                    PRIORITY_KEY));
+        for (String key: itemMap.keySet()) {
+            if (key != NAME_KEY && key != DESCRIPTION_KEY && key != DUE_DATE_KEY && key != PRIORITY_KEY) {
+                errors.add(String.format("Invalid input field '%s'", key));
+            }
         }
+        if (!errors.isEmpty()) {
+            return errors;
+        }
+
 
         Object name = itemMap.get(NAME_KEY);
         if (name == null)
