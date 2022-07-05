@@ -22,3 +22,6 @@ buildNumber.properties
 .vscode/settings.json
 
 src/main/resources/config.json
+src/main/resources/testConfig.json
+
+scripts/
