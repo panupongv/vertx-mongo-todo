@@ -58,8 +58,11 @@ public class WebVerticle extends AbstractVerticle {
     }
 
     Future<Void> startHttpServer(Router router) {
+        JsonObject http = config().getJsonObject("http", new JsonObject());
+        int httpPort = http.getInteger("port", 7777);
+        System.out.println("Running at port " + httpPort);
         HttpServer server = vertx.createHttpServer().requestHandler(router);
-        return Future.<HttpServer>future(promise -> server.listen(8080, promise)).mapEmpty();
+        return Future.<HttpServer>future(promise -> server.listen(httpPort, promise)).mapEmpty();
     }
 
     Handler<RoutingContext> requestTimeoutHandler(String requestName, int timeout) {
