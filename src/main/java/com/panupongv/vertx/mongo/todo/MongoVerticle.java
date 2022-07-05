@@ -27,7 +27,7 @@ public class MongoVerticle extends AbstractVerticle {
     public static final String REPLY_STATUS_CODE_KEY = "statusCode";
     public static final String REPLY_CONTENT_KEY = "content";
 
-    private static final String COLLECTION_NAME = "vertx_mongo_todos";
+    private static final String COLLECTION_NAME = "items";
     private static final String MONGO_ID_KEY = "_id";
     private static final String USERNAME_KEY = "username";
     private static final String ITEMS_KEY = "items";
@@ -54,15 +54,8 @@ public class MongoVerticle extends AbstractVerticle {
 
     private Future<Void> configureMongoDbClient() {
         try {
-            String uri = "mongodb://localhost:27017";
-            String db = "test-vertx";
-
-            JsonObject mongoconfig = new JsonObject()
-                    .put("connection_string", uri)
-                    .put("db_name", db);
-
-            mongoClient = MongoClient.createShared(vertx, mongoconfig);
-
+            JsonObject mongoConfig = config().getJsonObject("mongo");
+            mongoClient = MongoClient.createShared(vertx, mongoConfig);
             return mongoClient.runCommand("ping", new JsonObject().put("ping", 1)).mapEmpty();
         } catch (Exception e) {
             return Future.failedFuture(e.getMessage());

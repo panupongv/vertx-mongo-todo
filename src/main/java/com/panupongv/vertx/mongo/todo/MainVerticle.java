@@ -12,7 +12,7 @@ import io.vertx.core.json.JsonObject;
 public class MainVerticle extends AbstractVerticle {
 
     final String RUN_MODE_TEST = "test";
-    final String RUN_MODE_APP = "app";
+    final String RUN_MODE_PROD = "prod";
     final DeploymentOptions deploymentOptions = new DeploymentOptions();
 
     @Override
@@ -37,7 +37,7 @@ public class MainVerticle extends AbstractVerticle {
         String runMode = config().getString("runMode", RUN_MODE_TEST);
         System.out.println(String.format("Running in %s mode", runMode));
 
-        if (runMode.equals(RUN_MODE_APP)) {
+        if (runMode.equals(RUN_MODE_PROD)) {
             deploymentOptions.setConfig(config());
             return Future.succeededFuture();
         }
