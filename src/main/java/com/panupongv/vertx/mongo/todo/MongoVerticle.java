@@ -1,5 +1,7 @@
 package com.panupongv.vertx.mongo.todo;
 
+import org.bson.types.ObjectId;
+
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
@@ -25,7 +27,7 @@ public class MongoVerticle extends AbstractVerticle {
     public static final String REPLY_STATUS_CODE_KEY = "statusCode";
     public static final String REPLY_CONTENT_KEY = "content";
 
-    private static final String COLLECTION_NAME = "vertx_mongo_todos";
+    private static final String COLLECTION_NAME = "items";
     private static final String MONGO_ID_KEY = "_id";
     private static final String USERNAME_KEY = "username";
     private static final String ITEMS_KEY = "items";
@@ -52,15 +54,8 @@ public class MongoVerticle extends AbstractVerticle {
 
     private Future<Void> configureMongoDbClient() {
         try {
-            String uri = "mongodb://localhost:27017";
-            String db = "test-vertx";
-
-            JsonObject mongoconfig = new JsonObject()
-                    .put("connection_string", uri)
-                    .put("db_name", db);
-
-            mongoClient = MongoClient.createShared(vertx, mongoconfig);
-
+            JsonObject mongoConfig = config().getJsonObject("mongo");
+            mongoClient = MongoClient.createShared(vertx, mongoConfig);
             return mongoClient.runCommand("ping", new JsonObject().put("ping", 1)).mapEmpty();
         } catch (Exception e) {
             return Future.failedFuture(e.getMessage());
@@ -84,10 +79,10 @@ public class MongoVerticle extends AbstractVerticle {
         return Future.succeededFuture();
     }
 
-    public static JsonObject addItemMessage(String username, Item item) {
+    public static JsonObject addItemMessage(String username, JsonObject itemJson) {
         return new JsonObject()
                 .put(USERNAME_KEY, username)
-                .put(ITEM_KEY, item.getMongoDbJson());
+                .put(ITEM_KEY, itemJson);
     }
 
     public static JsonObject getItemMessage(String username, String itemId) {
@@ -149,14 +144,10 @@ public class MongoVerticle extends AbstractVerticle {
     private void addItem(Message<Object> msg) {
         JsonObject inputJson = (JsonObject) msg.body();
         String username = inputJson.getString(USERNAME_KEY);
-        JsonObject newItem = inputJson.getJsonObject(ITEM_KEY);
+        JsonObject newItem = inputJson.getJsonObject(ITEM_KEY).put(Item.MONGO_ID_KEY, new ObjectId().toString());
 
-        String queryJsonString = Utils.convertJsonQuotes(String.format("{'%s':'%s'}", USERNAME_KEY, username));
-        JsonObject query = new JsonObject(queryJsonString);
-
-        String updateJsonString = Utils.convertJsonQuotes(
-                String.format("{'$push': {'%s': %s}}", ITEMS_KEY, newItem.toString()));
-        JsonObject update = new JsonObject(updateJsonString);
+        JsonObject query = new JsonObject().put(USERNAME_KEY, username);
+        JsonObject update = new JsonObject().put("$push", new JsonObject().put(ITEMS_KEY, newItem));
 
         mongoClient.updateCollection(COLLECTION_NAME, query,
                 update).onComplete(asyncResult -> {

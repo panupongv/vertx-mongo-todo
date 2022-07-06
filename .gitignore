@@ -19,3 +19,9 @@ buildNumber.properties
 /local-db
 /journal
 *.turtle
+.vscode/settings.json
+
+src/main/resources/config.json
+src/main/resources/testConfig.json
+
+scripts/
