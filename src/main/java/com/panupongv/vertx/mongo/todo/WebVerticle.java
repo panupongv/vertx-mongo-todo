@@ -82,6 +82,11 @@ public class WebVerticle extends AbstractVerticle {
     }
 
     void checkUsernameIsValid(RoutingContext ctx) {
+        JsonObject jsonBody = ctx.getBodyAsJson();
+        if (jsonBody == null) {
+            ctx.request().response().setStatusCode(400).end("Missing JSON request body");
+            return;
+        }
         String username = ctx.getBodyAsJson().getString("username");
         if (username == null) {
             ctx.request().response().setStatusCode(400).end("A username must be provided");
