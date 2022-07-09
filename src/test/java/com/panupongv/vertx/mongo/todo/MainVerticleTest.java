@@ -9,9 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import io.reactiverse.junit5.web.WebClientOptionsInject;
-import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.MongoClient;
@@ -59,6 +59,12 @@ public class MainVerticleTest {
         }
     }
 
+    private String createUserUrl = "/api/v1/users";
+
+    private String addItemUrl(String username) {
+        return String.format("/api/v1/users/%s/items", username);
+    }
+
     @BeforeAll
     public static void initialSetup(Vertx vertx, VertxTestContext testContext) {
         System.out.println("Initial set up");
@@ -96,69 +102,57 @@ public class MainVerticleTest {
 
     @Test
     public void testCreateUser(Vertx vertx, VertxTestContext testContext) {
-        testRequest(client.post(TEST_PORT, "localhost", "/api/v1/users"))
-                .expect(statusCode(200))
-                .sendJson(new JsonObject().put("username", "newuser"), testContext)
-                .onComplete(x -> {
-                    System.out.println(x.result().statusCode());
-                    System.out.println(x.result().body());
-                    System.out.println(x.succeeded());
-                });
+        testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+                .expect(
+                        statusCode(200),
+                        bodyResponse(Buffer.buffer("User 'newuser' created"), null))
+                .sendJson(new JsonObject().put("username", "newuser"), testContext);
     }
 
     @Test
     public void testCreateInvalidUsernames(Vertx vertx, VertxTestContext testContext) {
-        testRequest(client.post(TEST_PORT, "localhost", "/api/v1/users"))
-                .expect(statusCode(400))
-                .send(testContext)
-                .onComplete(x -> {
-                    System.out.println(x.result().statusCode());
-                    System.out.println(x.result().body());
-                    System.out.println(x.succeeded());
-                });
+        testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+                .expect(
+                        statusCode(400),
+                        bodyResponse(Buffer.buffer("Missing JSON request body"), null))
+                .send(testContext);
 
-        testRequest(client.post(TEST_PORT, "localhost", "/api/v1/users"))
-                .expect(statusCode(400))
-                .sendJson(new JsonObject().put("random_key", "random value"), testContext)
-                .onComplete(x -> {
-                    System.out.println(x.result().statusCode());
-                    System.out.println(x.result().body());
-                    System.out.println(x.succeeded());
-                });
+        testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+                .expect(statusCode(400),
+                        bodyResponse(Buffer.buffer("A username must be provided"), null))
+                .sendJson(new JsonObject().put("random_key", "random value"), testContext);
 
-        testRequest(client.post(TEST_PORT, "localhost", "/api/v1/users"))
-                .expect(statusCode(400))
-                .sendJson(new JsonObject().put("username", ""), testContext)
-                .onComplete(x -> {
-                    System.out.println(x.result().statusCode());
-                    System.out.println(x.result().body());
-                    System.out.println(x.succeeded());
-                });
+        testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+                .expect(
+                        statusCode(400),
+                        bodyResponse(Buffer.buffer("Username must contain only alphabets and numbers, and must be between %d and %d characters long"), null))
+                .sendJson(new JsonObject().put("username", ""), testContext);
 
-        testRequest(client.post(TEST_PORT, "localhost", "/api/v1/users"))
-                .expect(statusCode(400))
-                .sendJson(new JsonObject().put("username", StringUtils.repeat("x", 40)), testContext)
-                .onComplete(x -> {
-                    System.out.println(x.result().statusCode());
-                    System.out.println(x.result().body());
-                    System.out.println(x.succeeded());
-                });
+        testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+                .expect(
+                        statusCode(400),
+                        bodyResponse(Buffer.buffer("Username must contain only alphabets and numbers, and must be between %d and %d characters long"), null))
+                .sendJson(new JsonObject().put("username", StringUtils.repeat("x", 40)), testContext);
+
     }
 
     @Test
     public void testCreateExistingUser(Vertx vertx, VertxTestContext testContext) {
-        String username = "newuser";
+        String username = "existinguser";
         mongoTestUtil.insertUser(username).onComplete(x -> {
             testRequest(client.post(TEST_PORT, "localhost", "/api/v1/users"))
-                    .expect(statusCode(400))
-                    .sendJson(new JsonObject().put("username", username), testContext)
-                    .onComplete(response -> {
-                        System.out.println("posted");
-                        System.out.println(response.result().statusCode());
-                        System.out.println(response.result().body());
-                        System.out.println(response.succeeded());
-                    });
+                    .expect(
+                            statusCode(400),
+                            bodyResponse(Buffer.buffer("User 'existinguser' already exists"), null))
+                    .sendJson(new JsonObject().put("username", username), testContext);
         });
-
     }
+
+    // addItem OK
+
+    // addItem No User
+
+    // addItem Missing body
+
+    // addItem invalid body
 }

@@ -119,7 +119,7 @@ public class WebVerticle extends AbstractVerticle {
                     ctx.next();
                 } else {
                     ctx.request().response().setStatusCode(400).end(
-                            userExists ? String.format("User '%s' already exist", username)
+                            userExists ? String.format("User '%s' already exists", username)
                                     : String.format("User '%s' does not exist", username));
                 }
             } else {
