@@ -125,13 +125,17 @@ public class MainVerticleTest {
         testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
                 .expect(
                         statusCode(400),
-                        bodyResponse(Buffer.buffer("Username must contain only alphabets and numbers, and must be between %d and %d characters long"), null))
+                        bodyResponse(Buffer.buffer(
+                                "Username must contain only alphabets and numbers, and must be between %d and %d characters long"),
+                                null))
                 .sendJson(new JsonObject().put("username", ""), testContext);
 
         testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
                 .expect(
                         statusCode(400),
-                        bodyResponse(Buffer.buffer("Username must contain only alphabets and numbers, and must be between %d and %d characters long"), null))
+                        bodyResponse(Buffer.buffer(
+                                "Username must contain only alphabets and numbers, and must be between %d and %d characters long"),
+                                null))
                 .sendJson(new JsonObject().put("username", StringUtils.repeat("x", 40)), testContext);
 
     }
@@ -140,7 +144,7 @@ public class MainVerticleTest {
     public void testCreateExistingUser(Vertx vertx, VertxTestContext testContext) {
         String username = "existinguser";
         mongoTestUtil.insertUser(username).onComplete(x -> {
-            testRequest(client.post(TEST_PORT, "localhost", "/api/v1/users"))
+            testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
                     .expect(
                             statusCode(400),
                             bodyResponse(Buffer.buffer("User 'existinguser' already exists"), null))
@@ -149,6 +153,25 @@ public class MainVerticleTest {
     }
 
     // addItem OK
+    @Test
+    public void testAddItem(Vertx vertx, VertxTestContext testContext) {
+        String username = "addItemUser";
+
+        mongoTestUtil.insertUser(username).onComplete(x -> {
+            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+                    .expect(
+                            statusCode(200),
+                            bodyResponse(Buffer.buffer("Item added"), null))
+                    .sendJson(new JsonObject()
+                            .put(Item.NAME_KEY, "Item Name")
+                            .put(Item.DESCRIPTION_KEY, "Item Description")
+                            .put(Item.DUE_DATE_KEY, "2022-07-08")
+                            .put(Item.PRIORITY_KEY, 100), testContext)
+                    .onComplete(ar -> {
+                        System.out.println(ar.result().body());
+                    });
+        });
+    }
 
     // addItem No User
 
