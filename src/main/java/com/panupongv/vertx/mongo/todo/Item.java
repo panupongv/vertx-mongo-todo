@@ -75,11 +75,11 @@ public class Item {
         else if (!(description instanceof String))
             errors.add("Item description must be a string");
         else if (!isValidDescription((String) description))
-            errors.add(String.format("Item description must be not exceed %d characters", MAX_DESCRIPTION_LENGTH));
+            errors.add(String.format("Item description must not exceed %d characters", MAX_DESCRIPTION_LENGTH));
 
         Object dueDate = itemMap.get(DUE_DATE_KEY);
         if (dueDate == null)
-            errors.add(String.format("Missing the due date, please use the key '%s'", DUE_DATE_KEY));
+            errors.add(String.format("Missing item due date, please use the key '%s'", DUE_DATE_KEY));
         else if (!(dueDate instanceof String))
             errors.add("Item due date must be a string");
         else if (!isValidDateFormat((String) dueDate))
