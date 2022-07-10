@@ -34,6 +34,7 @@ public class MainVerticleTest {
     @WebClientOptionsInject
     WebClient client = WebClient.create(vertx);
 
+    private static final String TEST_DB_NAME = "todo-app-test";
     private static MongoTestUtil mongoTestUtil;
 
     private static class MongoTestUtil {
@@ -71,7 +72,7 @@ public class MainVerticleTest {
 
         JsonObject mongoConfig = new JsonObject()
                 .put("connection_string", "mongodb://localhost:27017")
-                .put("db_name", "todo-app-test");
+                .put("db_name", TEST_DB_NAME);
         mongoTestUtil = new MongoTestUtil(MongoClient.create(vertx, mongoConfig));
         testContext.completeNow();
 
@@ -110,7 +111,7 @@ public class MainVerticleTest {
     }
 
     @Test
-    public void testCreateInvalidUsernames(Vertx vertx, VertxTestContext testContext) {
+    public void testCreateUserWithInvalidUsernames(Vertx vertx, VertxTestContext testContext) {
         testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
                 .expect(
                         statusCode(400),
@@ -141,7 +142,7 @@ public class MainVerticleTest {
     }
 
     @Test
-    public void testCreateExistingUser(Vertx vertx, VertxTestContext testContext) {
+    public void testCreateUserWithExistingUsername(Vertx vertx, VertxTestContext testContext) {
         String username = "existinguser";
         mongoTestUtil.insertUser(username).onComplete(x -> {
             testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
