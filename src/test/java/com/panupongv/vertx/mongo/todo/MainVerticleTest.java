@@ -167,14 +167,35 @@ public class MainVerticleTest {
                             .put(Item.NAME_KEY, "Item Name")
                             .put(Item.DESCRIPTION_KEY, "Item Description")
                             .put(Item.DUE_DATE_KEY, "2022-07-08")
-                            .put(Item.PRIORITY_KEY, 100), testContext)
-                    .onComplete(ar -> {
-                        System.out.println(ar.result().body());
-                    });
+                            .put(Item.PRIORITY_KEY, 100), testContext);
         });
     }
 
-    // addItem No User
+    @Test
+    public void testAddItemWithoutUser(Vertx vertx, VertxTestContext testContext) {
+        String username = "addItemUser";
+        testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+                .expect(
+                        statusCode(400),
+                        bodyResponse(Buffer.buffer("User 'addItemUser' does not exist"), null))
+                .sendJson(new JsonObject()
+                        .put(Item.NAME_KEY, "Item Name")
+                        .put(Item.DESCRIPTION_KEY, "Item Description")
+                        .put(Item.DUE_DATE_KEY, "2022-07-08")
+                        .put(Item.PRIORITY_KEY, 100), testContext);
+    }
+
+    @Test
+    public void testAddItemWithoutItemBody(Vertx vertx, VertxTestContext testContext) {
+        String username = "addItemUser";
+        mongoTestUtil.insertUser(username).onComplete(x -> {
+            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+                    .expect(
+                            statusCode(400),
+                            bodyResponse(Buffer.buffer("Missing request body"), null))
+                    .send(testContext);
+        });
+    }
 
     // addItem Missing body
 
