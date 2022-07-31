@@ -33,9 +33,15 @@ public class MongoVerticle extends AbstractVerticle {
     private static final String ITEMS_KEY = "items";
     private static final String ITEM_KEY = "item";
 
-    private enum SortOption {
-        BY_DATE,
-        BY_PRIORITY
+    static public enum SortOption {
+        BY_DATE("due_date"),
+        BY_PRIORITY("priority");
+
+        public final String label;
+
+        private SortOption(String lable) {
+            this.label = lable;
+        }
     }
 
     private MongoClient mongoClient;

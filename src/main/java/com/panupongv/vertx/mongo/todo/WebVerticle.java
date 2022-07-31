@@ -19,6 +19,7 @@ public class WebVerticle extends AbstractVerticle {
 
     private static final int CREATE_USER_TIMEOUT = 7000;
     private static final int ADD_ITEM_TIMEOUT = 7000;
+    private static final int LIST_ITEM_TIMEOUT = 10000;
 
     private enum UsernameSource {
         BODY,
@@ -53,6 +54,11 @@ public class WebVerticle extends AbstractVerticle {
                 .handler(requestTimeoutHandler("Add Item", ADD_ITEM_TIMEOUT))
                 .handler(checkUserExistBeforeOperations)
                 .handler(this::addItemHandler);
+
+        router.get("/api/v1/users/:username/items")
+                .handler(requestTimeoutHandler("List Item", LIST_ITEM_TIMEOUT))
+                .handler(checkUserExistBeforeOperations)
+                .handler(this::listItemHandler);
 
         return Future.succeededFuture(router);
     }
@@ -152,7 +158,22 @@ public class WebVerticle extends AbstractVerticle {
             String errorResponse = String.join("\n", errorsFromJson);
             ctx.request().response().setStatusCode(400).end(errorResponse);
         }
+    }
 
+    void listItemHandler(RoutingContext ctx) {
+        String username = ctx.pathParam("username");
+
+        List<String> sortOptionParams = ctx.queryParam("orderBy");
+        String sortOption = MongoVerticle.SortOption.BY_DATE.label;
+        if (sortOptionParams.size() > 0) sortOption = sortOptionParams.get(0);
+
+        if (sortOption.equals(MongoVerticle.SortOption.BY_DATE.label)) {
+            
+        } else if (sortOption.equals(MongoVerticle.SortOption.BY_PRIORITY.label)) {
+
+        } else {
+            ctx.request().response().setStatusCode(400).end(String.format("Invalid sort option '%s'", sortOption));
+        }
     }
 
     private Handler<AsyncResult<Message<Object>>> standardReplyHandler(RoutingContext ctx) {
