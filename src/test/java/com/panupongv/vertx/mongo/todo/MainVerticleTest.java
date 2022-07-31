@@ -153,7 +153,6 @@ public class MainVerticleTest {
         });
     }
 
-    // addItem OK
     @Test
     public void testAddItem(Vertx vertx, VertxTestContext testContext) {
         String username = "addItemUser";
@@ -197,7 +196,95 @@ public class MainVerticleTest {
         });
     }
 
-    // addItem Missing body
+    @Test
+    public void testAddItemWithInvalidItemBody(Vertx vertx, VertxTestContext testContext) {
+        String username = "addItemUser";
+        mongoTestUtil.insertUser(username).onComplete(x -> {
 
-    // addItem invalid body
+            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+                    .expect(
+                            statusCode(400),
+                            bodyResponse(Buffer.buffer("Invalid input field 'some_key'"), null))
+                    .sendJson(new JsonObject().put("some_key", "some value"),
+                            testContext)
+                    .onComplete(y -> {
+                        System.out.println(y.result().statusCode());
+                        System.out.println(y.result().body());
+                    });
+
+            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+                    .expect(
+                            statusCode(400),
+                            bodyResponse(Buffer.buffer(
+                                    "Missing item name, please use the key 'name'\n" +
+                                            "Missing item description, please use the key 'description'\n" +
+                                            "Missing item due date, please use the key 'due_date'\n" +
+                                            "Missing item priority, please use the key 'priority'"),
+                                    null))
+                    .sendJson(new JsonObject(), testContext);
+
+            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+                    .expect(
+                            statusCode(400),
+                            bodyResponse(Buffer.buffer(
+                                    "Item name must be a string\n" +
+                                            "Item description must be a string\n" +
+                                            "Item due date must be a string\n" +
+                                            "Item priority must be an integer"),
+                                    null))
+                    .sendJson(new JsonObject()
+                            .put("name", 99)
+                            .put("description", 100)
+                            .put("due_date", 123)
+                            .put("priority", "99"), testContext);
+
+            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+                    .expect(
+                            statusCode(400),
+                            bodyResponse(Buffer.buffer("Item name must be a non-empty string with 32 characters limit"),
+                                    null))
+                    .sendJson(new JsonObject()
+                            .put("name", "")
+                            .put("description", "Some description")
+                            .put("due_date", "2022-01-01")
+                            .put("priority", 99), testContext)
+                    .onComplete(y -> {
+                        System.out.println(y.result().statusCode());
+                        System.out.println(y.result().body());
+                    });
+
+            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+                    .expect(
+                            statusCode(400),
+                            bodyResponse(Buffer.buffer(
+                                    "Item due date must be a valid YYYY-MM-DD format date"),
+                                    null))
+                    .sendJson(new JsonObject()
+                            .put("name", "Item 99")
+                            .put("description", "Do something 100 times")
+                            .put("due_date", "02/07/2022")
+                            .put("priority", 99), testContext)
+                    .onComplete(y -> {
+                        System.out.println(y.result().statusCode());
+                        System.out.println(y.result().body());
+                    });
+
+            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+                    .expect(
+                            statusCode(400),
+                            bodyResponse(Buffer.buffer(
+                                    "Item due date must be a valid YYYY-MM-DD format date"),
+                                    null))
+                    .sendJson(new JsonObject()
+                            .put("name", "Item 99")
+                            .put("description", "Do something 100 times")
+                            .put("due_date", "2022-01-01")
+                            .put("priority", 99), testContext)
+                    .onComplete(y -> {
+                        System.out.println(y.result().statusCode());
+                        System.out.println(y.result().body());
+                    });
+
+        });
+    }
 }
