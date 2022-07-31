@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.apache.commons.validator.GenericValidator;
 import org.bson.types.ObjectId;
 
 import io.vertx.core.json.JsonObject;
@@ -24,8 +25,6 @@ public class Item {
 
     private static final int MAX_NAME_LENGTH = 32;
     private static final int MAX_DESCRIPTION_LENGTH = 256;
-    private static final Pattern DATE_PATTERN = Pattern.compile(
-            "^\\d{4}-\\d{2}-\\d{2}$");
 
     public Item(String name, String description, String dueDate, int priority) {
         this(new ObjectId(), name, description, dueDate, priority);
@@ -83,7 +82,7 @@ public class Item {
         else if (!(dueDate instanceof String))
             errors.add("Item due date must be a string");
         else if (!isValidDateFormat((String) dueDate))
-            errors.add("Item due date must be in the YYYY-MM-DD format");
+            errors.add("Item due date must be a valid YYYY-MM-DD format date");
 
         Object priority = itemMap.get(PRIORITY_KEY);
         if (priority == null)
@@ -114,6 +113,6 @@ public class Item {
     }
 
     public static boolean isValidDateFormat(String date) {
-        return DATE_PATTERN.matcher(date).matches();
+        return GenericValidator.isDate(date, "yyyy-MM-dd", true);
     }
 }

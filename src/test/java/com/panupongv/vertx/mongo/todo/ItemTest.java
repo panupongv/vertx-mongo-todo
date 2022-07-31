@@ -69,9 +69,12 @@ public class ItemTest {
 
     @Test
     public void testDateFormat() {
+        assertFalse(Item.isValidDateFormat(""));
         assertFalse(Item.isValidDateFormat("01/02/2022"));
         assertFalse(Item.isValidDateFormat("01-02-2022"));
-        assertFalse(Item.isValidDateFormat(""));
+        assertFalse(Item.isValidDateFormat("2022-13-01"));
+        assertFalse(Item.isValidDateFormat("2022-01-99"));
+        assertFalse(Item.isValidDateFormat("2022-02-30"));
         assertTrue(Item.isValidDateFormat("2022-02-01"));
     }
 }
