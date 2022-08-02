@@ -206,11 +206,7 @@ public class MainVerticleTest {
                             statusCode(400),
                             bodyResponse(Buffer.buffer("Invalid input field 'some_key'"), null))
                     .sendJson(new JsonObject().put("some_key", "some value"),
-                            testContext)
-                    .onComplete(y -> {
-                        System.out.println(y.result().statusCode());
-                        System.out.println(y.result().body());
-                    });
+                            testContext);
 
             testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
                     .expect(
@@ -247,11 +243,7 @@ public class MainVerticleTest {
                             .put("name", "")
                             .put("description", "Some description")
                             .put("due_date", "2022-01-01")
-                            .put("priority", 99), testContext)
-                    .onComplete(y -> {
-                        System.out.println(y.result().statusCode());
-                        System.out.println(y.result().body());
-                    });
+                            .put("priority", 99), testContext);
 
             testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
                     .expect(
@@ -263,11 +255,7 @@ public class MainVerticleTest {
                             .put("name", "Item 99")
                             .put("description", "Do something 100 times")
                             .put("due_date", "02/07/2022")
-                            .put("priority", 99), testContext)
-                    .onComplete(y -> {
-                        System.out.println(y.result().statusCode());
-                        System.out.println(y.result().body());
-                    });
+                            .put("priority", 99), testContext);
 
             testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
                     .expect(
@@ -279,11 +267,7 @@ public class MainVerticleTest {
                             .put("name", "Item 99")
                             .put("description", "Do something 100 times")
                             .put("due_date", "2022-01-01")
-                            .put("priority", 99), testContext)
-                    .onComplete(y -> {
-                        System.out.println(y.result().statusCode());
-                        System.out.println(y.result().body());
-                    });
+                            .put("priority", 99), testContext);
 
         });
     }
