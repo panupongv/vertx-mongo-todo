@@ -245,7 +245,8 @@ public class MongoVerticle extends AbstractVerticle {
         String username = inputJson.getString(USERNAME_KEY);
         JsonObject item = inputJson.getJsonObject(ITEM_KEY);
 
-        JsonObject query = findItemUnderUser(username, item.getString(MONGO_ID_KEY));
+        String itemId = item.getString(MONGO_ID_KEY);
+        JsonObject query = findItemUnderUser(username, itemId);
 
         JsonObject update = new JsonObject().put(
                 "$set", new JsonObject().put(ITEMS_KEY + ".$", item));
@@ -255,7 +256,7 @@ public class MongoVerticle extends AbstractVerticle {
                     if (asyncResult.succeeded()) {
                         if (asyncResult.result().getDocMatched() == 0) {
                             msg.reply(resultJson(400, String.format("Cannot find item with ID '%s'",
-                                    item.getString(Item.MONGO_ID_KEY))));
+                                    itemId)));
                             return;
                         }
                         if (asyncResult.result().getDocModified() == 0) {
