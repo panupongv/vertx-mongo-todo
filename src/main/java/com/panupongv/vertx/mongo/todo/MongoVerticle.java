@@ -15,14 +15,15 @@ public class MongoVerticle extends AbstractVerticle {
 
     private static final int SETUP_TIMEOUT = 10000;
 
-    public static final String CHECK_USER_EXIST = "com.panupongv.vertx-todo.check_user_exist";
-    public static final String CREATE_USER = "com.panupongv.vertx-todo.create_user";
-    public static final String ADD_ITEM = "com.panupongv.vertx-todo.add_item";
-    public static final String LIST_ITEMS_BY_DUE_DATE = "com.panupongv.vertx-todo.list_items_by_due_date";
-    public static final String LIST_ITEMS_BY_PRIORITY = "com.panupongv.vertx-todo.list_items_by_priority";
-    public static final String GET_ITEM = "com.panupongv.vertx-todo.get_item";
-    public static final String EDIT_ITEM = "com.panupongv.vertx-todo.edit_item";
-    public static final String DELETE_ITEM = "com.panupongv.vertx-todo.delete_item";
+    public static final String CHECK_USER_EXIST_ADDRESS = "com.panupongv.vertx-todo.check_user_exist";
+    public static final String CREATE_USER_ADDRESS = "com.panupongv.vertx-todo.create_user";
+    public static final String ADD_ITEM_ADDRESS = "com.panupongv.vertx-todo.add_item";
+    public static final String LIST_ITEMS_ADDRESS = "com.panupongv.vertx-todo.list_items";
+    public static final String LIST_ITEMS_BY_DUE_DATE_ADDRESS = "com.panupongv.vertx-todo.list_items_by_due_date";
+    public static final String LIST_ITEMS_BY_PRIORITY_ADDRESS = "com.panupongv.vertx-todo.list_items_by_priority";
+    public static final String GET_ITEM_ADDRESS = "com.panupongv.vertx-todo.get_item";
+    public static final String EDIT_ITEM_ADDRESS = "com.panupongv.vertx-todo.edit_item";
+    public static final String DELETE_ITEM_ADDRESS = "com.panupongv.vertx-todo.delete_item";
 
     public static final String REPLY_STATUS_CODE_KEY = "statusCode";
     public static final String REPLY_CONTENT_KEY = "content";
@@ -73,14 +74,14 @@ public class MongoVerticle extends AbstractVerticle {
         Handler<Message<Object>> listItemsByPriority = (Message<Object> msg) -> this.listItems(SortOption.BY_PRIORITY,
                 msg);
 
-        vertx.eventBus().consumer(CHECK_USER_EXIST).handler(this::checkUserExists);
-        vertx.eventBus().consumer(CREATE_USER).handler(this::createUser);
-        vertx.eventBus().consumer(ADD_ITEM).handler(this::addItem);
-        vertx.eventBus().consumer(LIST_ITEMS_BY_DUE_DATE).handler(listItemsByDueDate);
-        vertx.eventBus().consumer(LIST_ITEMS_BY_PRIORITY).handler(listItemsByPriority);
-        vertx.eventBus().consumer(GET_ITEM).handler(this::getItem);
-        vertx.eventBus().consumer(EDIT_ITEM).handler(this::editItem);
-        vertx.eventBus().consumer(DELETE_ITEM).handler(this::deleteItem);
+        vertx.eventBus().consumer(CHECK_USER_EXIST_ADDRESS).handler(this::checkUserExists);
+        vertx.eventBus().consumer(CREATE_USER_ADDRESS).handler(this::createUser);
+        vertx.eventBus().consumer(ADD_ITEM_ADDRESS).handler(this::addItem);
+        vertx.eventBus().consumer(LIST_ITEMS_BY_DUE_DATE_ADDRESS).handler(listItemsByDueDate);
+        vertx.eventBus().consumer(LIST_ITEMS_BY_PRIORITY_ADDRESS).handler(listItemsByPriority);
+        vertx.eventBus().consumer(GET_ITEM_ADDRESS).handler(this::getItem);
+        vertx.eventBus().consumer(EDIT_ITEM_ADDRESS).handler(this::editItem);
+        vertx.eventBus().consumer(DELETE_ITEM_ADDRESS).handler(this::deleteItem);
 
         return Future.succeededFuture();
     }

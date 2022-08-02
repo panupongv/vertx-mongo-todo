@@ -118,7 +118,7 @@ public class WebVerticle extends AbstractVerticle {
         }
 
         final String username = tempUsername;
-        vertx.eventBus().request(MongoVerticle.CHECK_USER_EXIST, username, databaseResult -> {
+        vertx.eventBus().request(MongoVerticle.CHECK_USER_EXIST_ADDRESS, username, databaseResult -> {
             if (databaseResult.succeeded()) {
                 Boolean userExists = (Boolean) databaseResult.result().body();
                 if (userExists == userShouldExist) {
@@ -137,7 +137,7 @@ public class WebVerticle extends AbstractVerticle {
 
     void createUserHandler(RoutingContext ctx) {
         String username = ctx.getBodyAsJson().getString("username");
-        vertx.eventBus().request(MongoVerticle.CREATE_USER, username, standardReplyHandler(ctx));
+        vertx.eventBus().request(MongoVerticle.CREATE_USER_ADDRESS, username, standardReplyHandler(ctx));
     }
 
     void addItemHandler(RoutingContext ctx) {
@@ -151,7 +151,7 @@ public class WebVerticle extends AbstractVerticle {
         List<String> errorsFromJson = Item.collectErrorsFromJson(itemJson);
         if (errorsFromJson.isEmpty()) {
             vertx.eventBus().request(
-                    MongoVerticle.ADD_ITEM,
+                    MongoVerticle.ADD_ITEM_ADDRESS,
                     MongoVerticle.addItemMessage(username, itemJson),
                     standardReplyHandler(ctx));
         } else {
