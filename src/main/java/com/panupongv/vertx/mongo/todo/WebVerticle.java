@@ -2,6 +2,8 @@ package com.panupongv.vertx.mongo.todo;
 
 import java.util.List;
 
+import com.panupongv.vertx.mongo.todo.MongoVerticle.SortOption;
+
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
@@ -58,7 +60,7 @@ public class WebVerticle extends AbstractVerticle {
         router.get("/api/v1/users/:username/items")
                 .handler(requestTimeoutHandler("List Item", LIST_ITEM_TIMEOUT))
                 .handler(checkUserExistBeforeOperations)
-                .handler(this::listItemHandler);
+                .handler(this::listItemsHandler);
 
         return Future.succeededFuture(router);
     }
@@ -160,19 +162,22 @@ public class WebVerticle extends AbstractVerticle {
         }
     }
 
-    void listItemHandler(RoutingContext ctx) {
+    void listItemsHandler(RoutingContext ctx) {
         String username = ctx.pathParam("username");
 
         List<String> sortOptionParams = ctx.queryParam("orderBy");
-        String sortOption = MongoVerticle.SortOption.BY_DATE.label;
-        if (sortOptionParams.size() > 0) sortOption = sortOptionParams.get(0);
+        String sortOption = "";
+        if (sortOptionParams.size() > 0)
+            sortOption = sortOptionParams.get(0);
+        String eventBusAddress = SortOption.getEventBusAddressFromString(sortOption);
 
-        if (sortOption.equals(MongoVerticle.SortOption.BY_DATE.label)) {
-            
-        } else if (sortOption.equals(MongoVerticle.SortOption.BY_PRIORITY.label)) {
-
+        if (eventBusAddress != null) {
+            vertx.eventBus().request(
+                    eventBusAddress,
+                    MongoVerticle.listItemsMessage(username),
+                    standardReplyHandler(ctx));
         } else {
-            ctx.request().response().setStatusCode(400).end(String.format("Invalid sort option '%s'", sortOption));
+            ctx.request().response().setStatusCode(400).end(String.format("Cannot order by '%s'", sortOption));
         }
     }
 

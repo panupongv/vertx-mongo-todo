@@ -35,13 +35,26 @@ public class MongoVerticle extends AbstractVerticle {
     private static final String ITEM_KEY = "item";
 
     static public enum SortOption {
-        BY_DATE("due_date"),
-        BY_PRIORITY("priority");
+        BY_DATE("due_date", LIST_ITEMS_BY_DUE_DATE_ADDRESS),
+        BY_PRIORITY("priority", LIST_ITEMS_BY_PRIORITY_ADDRESS);
 
         public final String label;
+        public final String eventBusAddress;
 
-        private SortOption(String lable) {
+        private SortOption(String lable, String eventBusAddress) {
             this.label = lable;
+            this.eventBusAddress = eventBusAddress;
+        }
+
+        public static String getEventBusAddressFromString(String queryParam) {
+            if (queryParam.isEmpty())
+                return BY_DATE.eventBusAddress;
+            for (SortOption sortOption : SortOption.values()) {
+                if (sortOption.label.equals(queryParam)) {
+                    return sortOption.eventBusAddress;
+                }
+            }
+            return null;
         }
     }
 
@@ -90,6 +103,11 @@ public class MongoVerticle extends AbstractVerticle {
         return new JsonObject()
                 .put(USERNAME_KEY, username)
                 .put(ITEM_KEY, itemJson);
+    }
+
+    public static JsonObject listItemsMessage(String username) {
+        return new JsonObject()
+                .put(USERNAME_KEY, username);
     }
 
     public static JsonObject getItemMessage(String username, String itemId) {
@@ -167,7 +185,8 @@ public class MongoVerticle extends AbstractVerticle {
     }
 
     private void listItems(SortOption sortOption, Message<Object> msg) {
-        String username = (String) msg.body();
+        JsonObject inputJson = (JsonObject) msg.body();
+        String username = inputJson.getString(USERNAME_KEY);
 
         JsonObject findUser = matchUsernameClause(username);
         JsonObject unwindItems = unwindItemsClause();
@@ -176,13 +195,18 @@ public class MongoVerticle extends AbstractVerticle {
                 .put(USERNAME_KEY, 0)
                 .put(ITEMS_KEY, new JsonObject().put(Item.DESCRIPTION_KEY, 0)));
 
-        JsonObject sortItemsOption = new JsonObject().put(ITEMS_KEY + "." + Item.DUE_DATE_KEY, 1);
+        JsonObject sortItemsOption;
         switch (sortOption) {
             case BY_DATE:
+                sortItemsOption = new JsonObject().put(ITEMS_KEY + "." + Item.DUE_DATE_KEY, 1);
                 break;
             case BY_PRIORITY:
                 sortItemsOption = new JsonObject().put(ITEMS_KEY + "." + Item.PRIORITY_KEY, -1);
                 break;
+            default:
+                msg.reply(resultJson(400,
+                        String.format("Not implementation for sort option '%s'", sortOption.toString())));
+                return;
         }
         JsonObject sortItems = new JsonObject().put("$sort", sortItemsOption);
 
