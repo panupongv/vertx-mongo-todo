@@ -334,7 +334,10 @@ public class MongoVerticle extends AbstractVerticle {
     }
 
     private JsonObject unwindItemsClause() {
-        return new JsonObject().put("$unwind", "$" + ITEMS_KEY);
+        return new JsonObject()
+                .put("$unwind", new JsonObject()
+                        .put("path", "$" + ITEMS_KEY)
+                        .put("preserveNullAndEmptyArrays", true));
     }
 
     private JsonObject findItemUnderUser(String username, String itemId) {
