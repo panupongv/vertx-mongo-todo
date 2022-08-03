@@ -26,6 +26,7 @@ import static io.reactiverse.junit5.web.TestRequest.*;
 })
 public class MainVerticleTest {
     final int TEST_PORT = 7777;
+    final String HOST = "localhost";
     String deploymentId;
 
     Vertx vertx = Vertx.vertx();
@@ -87,8 +88,7 @@ public class MainVerticleTest {
                 .assertComplete(vertx.deployVerticle(MainVerticle.class.getName()))
                 .onComplete(ar -> {
                     deploymentId = ar.result();
-                    mongoTestUtil.cleanDb();
-                    testContext.completeNow();
+                    mongoTestUtil.cleanDb().onComplete(x -> testContext.completeNow());
                 });
     }
 
@@ -103,7 +103,7 @@ public class MainVerticleTest {
 
     @Test
     public void testCreateUser(Vertx vertx, VertxTestContext testContext) {
-        testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+        testRequest(client.post(TEST_PORT, HOST, createUserUrl))
                 .expect(
                         statusCode(200),
                         bodyResponse(Buffer.buffer("User 'newuser' created"), null))
@@ -112,18 +112,18 @@ public class MainVerticleTest {
 
     @Test
     public void testCreateUserWithInvalidUsernames(Vertx vertx, VertxTestContext testContext) {
-        testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+        testRequest(client.post(TEST_PORT, HOST, createUserUrl))
                 .expect(
                         statusCode(400),
                         bodyResponse(Buffer.buffer("Missing JSON request body"), null))
                 .send(testContext);
 
-        testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+        testRequest(client.post(TEST_PORT, HOST, createUserUrl))
                 .expect(statusCode(400),
                         bodyResponse(Buffer.buffer("A username must be provided"), null))
                 .sendJson(new JsonObject().put("random_key", "random value"), testContext);
 
-        testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+        testRequest(client.post(TEST_PORT, HOST, createUserUrl))
                 .expect(
                         statusCode(400),
                         bodyResponse(Buffer.buffer(
@@ -131,7 +131,7 @@ public class MainVerticleTest {
                                 null))
                 .sendJson(new JsonObject().put("username", ""), testContext);
 
-        testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+        testRequest(client.post(TEST_PORT, HOST, createUserUrl))
                 .expect(
                         statusCode(400),
                         bodyResponse(Buffer.buffer(
@@ -145,7 +145,7 @@ public class MainVerticleTest {
     public void testCreateUserWithExistingUsername(Vertx vertx, VertxTestContext testContext) {
         String username = "existinguser";
         mongoTestUtil.insertUser(username).onComplete(x -> {
-            testRequest(client.post(TEST_PORT, "localhost", createUserUrl))
+            testRequest(client.post(TEST_PORT, HOST, createUserUrl))
                     .expect(
                             statusCode(400),
                             bodyResponse(Buffer.buffer("User 'existinguser' already exists"), null))
@@ -158,7 +158,7 @@ public class MainVerticleTest {
         String username = "addItemUser";
 
         mongoTestUtil.insertUser(username).onComplete(x -> {
-            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+            testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(200),
                             bodyResponse(Buffer.buffer("Item added"), null))
@@ -173,7 +173,7 @@ public class MainVerticleTest {
     @Test
     public void testAddItemWithoutUser(Vertx vertx, VertxTestContext testContext) {
         String username = "addItemUser";
-        testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+        testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                 .expect(
                         statusCode(400),
                         bodyResponse(Buffer.buffer("User 'addItemUser' does not exist"), null))
@@ -188,7 +188,7 @@ public class MainVerticleTest {
     public void testAddItemWithoutItemBody(Vertx vertx, VertxTestContext testContext) {
         String username = "addItemUser";
         mongoTestUtil.insertUser(username).onComplete(x -> {
-            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+            testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
                             bodyResponse(Buffer.buffer("Missing request body"), null))
@@ -201,14 +201,14 @@ public class MainVerticleTest {
         String username = "addItemUser";
         mongoTestUtil.insertUser(username).onComplete(x -> {
 
-            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+            testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
                             bodyResponse(Buffer.buffer("Invalid input field 'some_key'"), null))
                     .sendJson(new JsonObject().put("some_key", "some value"),
                             testContext);
 
-            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+            testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
                             bodyResponse(Buffer.buffer(
@@ -219,7 +219,7 @@ public class MainVerticleTest {
                                     null))
                     .sendJson(new JsonObject(), testContext);
 
-            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+            testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
                             bodyResponse(Buffer.buffer(
@@ -234,7 +234,7 @@ public class MainVerticleTest {
                             .put("due_date", 123)
                             .put("priority", "99"), testContext);
 
-            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+            testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
                             bodyResponse(Buffer.buffer("Item name must be a non-empty string with 32 characters limit"),
@@ -245,7 +245,7 @@ public class MainVerticleTest {
                             .put("due_date", "2022-01-01")
                             .put("priority", 99), testContext);
 
-            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+            testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
                             bodyResponse(Buffer.buffer(
@@ -257,7 +257,7 @@ public class MainVerticleTest {
                             .put("due_date", "02/07/2022")
                             .put("priority", 99), testContext);
 
-            testRequest(client.post(TEST_PORT, "localhost", addItemUrl(username)))
+            testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
                             bodyResponse(Buffer.buffer(
