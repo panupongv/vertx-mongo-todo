@@ -268,7 +268,101 @@ public class MainVerticleTest {
                             .put("description", "Do something 100 times")
                             .put("due_date", "2022-01-01")
                             .put("priority", 99), testContext);
+    private Item item1 = new Item("name1", "description1", "2022-08-01", 11);
+    private Item item2 = new Item("name2", "description2", "2022-08-04", 22);
+    private Item item3 = new Item("name3", "description3", "2022-08-03", 33);
+    private Item item4 = new Item("name4", "description4", "2022-08-02", 44);
 
+    private JsonArray itemsOrderedByDueDate = new JsonArray()
+            .add(itemExcludingDescription(item1))
+            .add(itemExcludingDescription(item4))
+            .add(itemExcludingDescription(item3))
+            .add(itemExcludingDescription(item2));
+
+    private JsonArray itemsOrderedByPriority = new JsonArray()
+            .add(itemExcludingDescription(item4))
+            .add(itemExcludingDescription(item3))
+            .add(itemExcludingDescription(item2))
+            .add(itemExcludingDescription(item1));
+
+    private JsonObject itemExcludingDescription(Item item) {
+        JsonObject itemJson = item.getMongoDbJson();
+        itemJson.remove("description");
+        return itemJson;
+    }
+
+    private Future<Void> insertListItemsTestData(String username) {
+        String anotherUsername = "IrrelevantUser";
+
+        return CompositeFuture.all(
+                mongoTestUtil.insertUser(username),
+                mongoTestUtil.insertUser(anotherUsername))
+                .compose(outcome -> {
+                    return CompositeFuture
+                            .all(
+                                    mongoTestUtil.insertItem(username, item1),
+                                    mongoTestUtil.insertItem(username, item2),
+                                    mongoTestUtil.insertItem(username, item3),
+                                    mongoTestUtil.insertItem(username, item4),
+                                    mongoTestUtil.insertItem(anotherUsername, item1),
+                                    mongoTestUtil.insertItem(anotherUsername, item1))
+                            .mapEmpty();
+                });
+    }
+
+    @Test
+    public void testListItemsOrderNotSpecified(Vertx vertx, VertxTestContext testContext) {
+
+        String username = "listItemsUser";
+        insertListItemsTestData(username).onComplete(x -> {
+            testRequest(client.get(TEST_PORT, HOST, listItemsUrl(username, null)))
+                    .expect(
+                            statusCode(200),
+                            responseHeader("Content-Type", "application/json"),
+                            jsonBodyResponse(itemsOrderedByDueDate))
+                    .send(testContext);
+        });
+    }
+
+    @Test
+    public void testListItemsOrderByEmptyString(Vertx vertx, VertxTestContext testContext) {
+
+        String username = "listItemsUser";
+        insertListItemsTestData(username).onComplete(x -> {
+            testRequest(client.get(TEST_PORT, HOST, listItemsUrl(username, "")))
+                    .expect(
+                            statusCode(200),
+                            responseHeader("Content-Type", "application/json"),
+                            jsonBodyResponse(itemsOrderedByDueDate))
+                    .send(testContext);
+        });
+    }
+
+    @Test
+    public void testListItemsOrderByDueDate(Vertx vertx, VertxTestContext testContext) {
+
+        String username = "listItemsUser";
+        insertListItemsTestData(username).onComplete(x -> {
+            testRequest(client.get(TEST_PORT, HOST, listItemsUrl(username, "due_date")))
+                    .expect(
+                            statusCode(200),
+                            responseHeader("Content-Type", "application/json"),
+                            jsonBodyResponse(itemsOrderedByDueDate))
+                    .send(testContext);
+        });
+    }
+
+    @Test
+    public void testListItemsOrderByPriority(Vertx vertx, VertxTestContext testContext) {
+
+        String username = "listItemsUser";
+        insertListItemsTestData(username).onComplete(x -> {
+            testRequest(client.get(TEST_PORT, HOST, listItemsUrl(username, "priority")))
+                    .expect(
+                            statusCode(200),
+                            responseHeader("Content-Type", "application/json"),
+                            jsonBodyResponse(itemsOrderedByPriority))
+                    .send(testContext);
         });
     }
 }

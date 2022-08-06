@@ -11,6 +11,7 @@ import io.vertx.core.Handler;
 import io.vertx.core.Promise;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
@@ -22,6 +23,9 @@ public class WebVerticle extends AbstractVerticle {
     private static final int CREATE_USER_TIMEOUT = 7000;
     private static final int ADD_ITEM_TIMEOUT = 7000;
     private static final int LIST_ITEM_TIMEOUT = 10000;
+
+    private static final String CONTENT_TYPE_HEADER = "Content-Type";
+    private static final String APPLICATION_JSON_HEADER_VALUE = "application/json";
 
     private enum UsernameSource {
         BODY,
@@ -175,19 +179,25 @@ public class WebVerticle extends AbstractVerticle {
             vertx.eventBus().request(
                     eventBusAddress,
                     MongoVerticle.listItemsMessage(username),
-                    standardReplyHandler(ctx));
+                    standardReplyHandler(ctx, APPLICATION_JSON_HEADER_VALUE));
         } else {
             ctx.request().response().setStatusCode(400).end(String.format("Cannot order by '%s'", sortOption));
         }
     }
 
     private Handler<AsyncResult<Message<Object>>> standardReplyHandler(RoutingContext ctx) {
+        return standardReplyHandler(ctx, null);
+    }
+
+    private Handler<AsyncResult<Message<Object>>> standardReplyHandler(RoutingContext ctx, String contentType) {
         return (AsyncResult<Message<Object>> asyncResult) -> {
             if (asyncResult.succeeded()) {
                 JsonObject resultJson = (JsonObject) asyncResult.result().body();
-                ctx.request().response()
-                        .setStatusCode(resultJson.getInteger(MongoVerticle.REPLY_STATUS_CODE_KEY))
-                        .end(resultJson.getString(MongoVerticle.REPLY_CONTENT_KEY));
+                HttpServerResponse response = ctx.request().response()
+                        .setStatusCode(resultJson.getInteger(MongoVerticle.REPLY_STATUS_CODE_KEY));
+                if (contentType != null)
+                    response = response.putHeader(CONTENT_TYPE_HEADER, contentType);
+                response.end(resultJson.getString(MongoVerticle.REPLY_CONTENT_KEY));
             } else {
                 System.out.println(asyncResult.cause());
                 ctx.request().response().setStatusCode(500).end(asyncResult.cause().getMessage());
