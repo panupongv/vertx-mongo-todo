@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import io.reactiverse.junit5.web.WebClientOptionsInject;
+import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
@@ -47,8 +48,8 @@ public class MainVerticleTest {
             this.mongoClient = mongoClient;
         }
 
-        public void cleanDb() {
-            mongoClient.removeDocument(COLLECTION_NAME, new JsonObject());
+        public Future<Void> cleanDb() {
+            return mongoClient.removeDocuments(COLLECTION_NAME, new JsonObject()).mapEmpty();
         }
 
         public Future<Void> insertUser(String username) {
@@ -59,12 +60,23 @@ public class MainVerticleTest {
                             .put("items", new JsonArray()))
                     .mapEmpty();
         }
+
+        public Future<Void> insertItem(String username, Item item) {
+            JsonObject query = new JsonObject().put("username", username);
+            JsonObject update = new JsonObject().put("$push", new JsonObject().put("items", item.getMongoDbJson()));
+            return mongoClient.updateCollection(COLLECTION_NAME, query, update).mapEmpty();
+        }
     }
 
     private String createUserUrl = "/api/v1/users";
 
     private String addItemUrl(String username) {
         return String.format("/api/v1/users/%s/items", username);
+    }
+
+    private String listItemsUrl(String username, String orderBy) {
+        return String.format("/api/v1/users/%s/items", username) +
+                (orderBy != null ? "?orderBy=" + orderBy : "");
     }
 
     @BeforeAll
@@ -76,8 +88,6 @@ public class MainVerticleTest {
                 .put("db_name", TEST_DB_NAME);
         mongoTestUtil = new MongoTestUtil(MongoClient.create(vertx, mongoConfig));
         testContext.completeNow();
-
-        ;
     }
 
     @BeforeEach
@@ -197,7 +207,7 @@ public class MainVerticleTest {
     }
 
     @Test
-    public void testAddItemWithInvalidItemBody(Vertx vertx, VertxTestContext testContext) {
+    public void testAddItemWithInvalidJsonKey(Vertx vertx, VertxTestContext testContext) {
         String username = "addItemUser";
         mongoTestUtil.insertUser(username).onComplete(x -> {
 
@@ -207,7 +217,13 @@ public class MainVerticleTest {
                             bodyResponse(Buffer.buffer("Invalid input field 'some_key'"), null))
                     .sendJson(new JsonObject().put("some_key", "some value"),
                             testContext);
+        });
+    }
 
+    @Test
+    public void testAddItemWithEmptyJson(Vertx vertx, VertxTestContext testContext) {
+        String username = "addItemUser";
+        mongoTestUtil.insertUser(username).onComplete(x -> {
             testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
@@ -218,7 +234,13 @@ public class MainVerticleTest {
                                             "Missing item priority, please use the key 'priority'"),
                                     null))
                     .sendJson(new JsonObject(), testContext);
+        });
+    }
 
+    @Test
+    public void testAddItemWithWrongTypes(Vertx vertx, VertxTestContext testContext) {
+        String username = "addItemUser";
+        mongoTestUtil.insertUser(username).onComplete(x -> {
             testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
@@ -233,7 +255,13 @@ public class MainVerticleTest {
                             .put("description", 100)
                             .put("due_date", 123)
                             .put("priority", "99"), testContext);
+        });
+    }
 
+    @Test
+    public void testAddItemWithInvalidName(Vertx vertx, VertxTestContext testContext) {
+        String username = "addItemUser";
+        mongoTestUtil.insertUser(username).onComplete(x -> {
             testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
@@ -244,7 +272,13 @@ public class MainVerticleTest {
                             .put("description", "Some description")
                             .put("due_date", "2022-01-01")
                             .put("priority", 99), testContext);
+        });
+    }
 
+    @Test
+    public void testAddItemWithInvalidDateFormat(Vertx vertx, VertxTestContext testContext) {
+        String username = "addItemUser";
+        mongoTestUtil.insertUser(username).onComplete(x -> {
             testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
@@ -256,7 +290,13 @@ public class MainVerticleTest {
                             .put("description", "Do something 100 times")
                             .put("due_date", "02/07/2022")
                             .put("priority", 99), testContext);
+        });
+    }
 
+    @Test
+    public void testAddItemWithInvalidDateFormat2(Vertx vertx, VertxTestContext testContext) {
+        String username = "addItemUser";
+        mongoTestUtil.insertUser(username).onComplete(x -> {
             testRequest(client.post(TEST_PORT, HOST, addItemUrl(username)))
                     .expect(
                             statusCode(400),
@@ -266,8 +306,11 @@ public class MainVerticleTest {
                     .sendJson(new JsonObject()
                             .put("name", "Item 99")
                             .put("description", "Do something 100 times")
-                            .put("due_date", "2022-01-01")
+                            .put("due_date", "2022-99-01")
                             .put("priority", 99), testContext);
+        });
+    }
+
     private Item item1 = new Item("name1", "description1", "2022-08-01", 11);
     private Item item2 = new Item("name2", "description2", "2022-08-04", 22);
     private Item item3 = new Item("name3", "description3", "2022-08-03", 33);
